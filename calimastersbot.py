@@ -36,7 +36,7 @@ async def top8(ctx):
 async def rank(ctx, *, query: str):
     
     if query.strip().lower() == 'corsairs':
-    return await ctx.send('utter trash')
+        return await ctx.send('utter trash')
     
     """Usage: !rank <player name>"""
     async with aiohttp.ClientSession() as session:
