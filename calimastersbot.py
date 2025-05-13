@@ -34,6 +34,10 @@ async def top8(ctx):
     
 @bot.command(name='rank', help='Show current rank & score for a specific player')
 async def rank(ctx, *, query: str):
+    
+    if query.strip().lower() == 'corsairs':
+    return await ctx.send('utter trash')
+    
     """Usage: !rank <player name>"""
     async with aiohttp.ClientSession() as session:
         async with session.get(LEADERBOARD_URL) as resp:
