@@ -143,7 +143,7 @@ ALIAS_MAP = {
     'gitz': 'Gloomspite Gitz', 'gloomspite gitz': 'Gloomspite Gitz'
 }
 
-@aos_bot.command(name='winrates', help='!winrates [time]|[faction_alias] [time]')
+@aos_bot.command(name='winrates', aliases=['winrate'], help='!winrates [time]|[faction_alias] [time]')
 async def winrates_cmd(ctx, arg: str = 'all', maybe_time: str = None):
     arg_lower = arg.lower()
     if arg_lower in TIME_FILTERS:
