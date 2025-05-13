@@ -85,6 +85,8 @@ async def top8(ctx):
     for i, rec in enumerate(top, 1):
         name = f"{rec['first_name']} {rec['last_name']}"
         lines.append(f"{i}. **{name}** — {rec['top4_sum']} pts")
+    lines.append("")
+    lines.append("Full table: https://aos-events.com/calimasters")    
     await ctx.send("\n".join(lines))
 
 @leaderboard_bot.command(name='rank', help='Show rank, score, and event count for a player')
