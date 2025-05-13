@@ -99,7 +99,7 @@ async def rank(ctx, *, query: str):
     if key == 'ligmar':
         return await ctx.send('BALLS!')
     if key == 'jessica':
-        return await ctx.send('Best Corsair')
+        return await ctx.send('☠️ Best Corsair ☠️')
 
     data = await fetch_json(LEADERBOARD_URL)
     pattern = re.compile(r'^event_(\d+)_id$')
