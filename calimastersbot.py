@@ -25,6 +25,34 @@ intents.message_content = True
 leaderboard_bot = commands.Bot(command_prefix='!', intents=intents, description="Cali Masters Leaderboard Bot")
 aos_bot = commands.Bot(command_prefix='!', intents=intents, description="AoS Win Rates Bot")
 
+# Emoji mapping for factions
+EMOJI_MAP = {
+    'Flesh-eater Courts': '🦴',
+    'Idoneth Deepkin': '🌊',
+    'Lumineth Realm-lords': '💡',
+    'Disciples of Tzeentch': '🔮',
+    'Sons of Behemat': '🍖',
+    'Sylvaneth': '🌳',
+    'Seraphon': '🦎',
+    'Soulblight Gravelords': '🩸',
+    'Blades of Khorne': '🔥',
+    'Stormcast Eternals': '⚡',
+    'Hedonites of Slaanesh': '🎵',
+    'Cities of Sigmar': '🏙️',
+    'Daughters of Khaine': '🩸',
+    'Ogor Mawtribes': '🍖',
+    'Slaves to Darkness': '⛓️',
+    'Maggotkin of Nurgle': '🪱',
+    'Ossiarch Bonereapers': '💀',
+    'Ironjawz': '🔨',
+    'Kharadron Overlords': '⚓',
+    'Nighthaunt': '👻',
+    'Skaven': '🐀',
+    'Kruleboyz': '👺',
+    'Fyreslayers': '🪓',
+    'Gloomspite Gitz': '🍄'
+}
+
 # Common helpers
 def random_acronym(letters: str) -> str:
     COMMON_WORDS = top_n_list("en", 20000)
@@ -87,7 +115,6 @@ async def rank(ctx, *, query: str):
 TIME_FILTERS = ['all', 'recent', 'battlescroll']
 EXCLUDE_FACTIONS = ['Beasts of Chaos', 'Bonesplitterz']
 ALIAS_MAP = {
-    # (same alias map as before)
     'fec': 'Flesh-eater Courts', 'flesh-eater courts': 'Flesh-eater Courts',
     'idk': 'Idoneth Deepkin', 'idoneth': 'Idoneth Deepkin', 'deepkin': 'Idoneth Deepkin',
     'lrl': 'Lumineth Realm-lords', 'lumineth': 'Lumineth Realm-lords', 'realm-lords': 'Lumineth Realm-lords',
@@ -132,7 +159,8 @@ async def send_full_list(ctx, time_filter):
     lines = [f"AoS Faction Win Rates ({time_filter}) sorted:"]
     for f in sorted_f:
         pct = (f['wins']/f['games']*100) if f['games'] else 0
-        lines.append(f"{f['name']}: {f['wins']}/{f['games']} ({pct:.2f}%)")
+        emoji = EMOJI_MAP.get(f['name'], '')
+        lines.append(f"{emoji} {f['name']}: {f['wins']}/{f['games']} ({pct:.2f}%)")
     lines += ['', 'Source: https://aos-events.com']
     await send_lines(ctx, lines)
 
@@ -143,7 +171,8 @@ async def send_single(ctx, key, tf):
     if not f:
         return await ctx.send(f"Faction '{name}' not found.")
     pct = (f['wins']/f['games']*100) if f['games'] else 0
-    await ctx.send(f"**{name}** ({tf}): {f['wins']}/{f['games']} ({pct:.2f}%)\nSource: https://aos-events.com")
+    emoji = EMOJI_MAP.get(name, '')
+    await ctx.send(f"{emoji} **{name}** ({tf}): {f['wins']}/{f['games']} ({pct:.2f}%)\nSource: https://aos-events.com")
 
 async def send_lines(ctx, lines):
     chunks = []
