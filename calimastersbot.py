@@ -32,35 +32,49 @@ async def top8(ctx):
         lines.append(f"{i}. **{name}** — {score} pts")
     await ctx.send("\n".join(lines))
     
-@bot.command(name='rank', help='Show current rank & score for a specific player')
+import re
+
+@bot.command(name='rank', help='Show current rank, score, and event count for a specific player')
 async def rank(ctx, *, query: str):
-    
+    """Usage: !rank <player name>"""
+
+    # Special case:
     if query.strip().lower() == 'corsairs':
         return await ctx.send('utter trash')
-    
-    """Usage: !rank <player name>"""
+
+    # Fetch leaderboard
     async with aiohttp.ClientSession() as session:
         async with session.get(LEADERBOARD_URL) as resp:
             if resp.status != 200:
                 return await ctx.send(f"Error fetching leaderboard (HTTP {resp.status})")
             data = await resp.json()
 
-    # case-insensitive match on full name, first or last
-    matches = []
+    # Find matches
     q = query.strip().lower()
+    matches = []
     for idx, rec in enumerate(data, start=1):
         full = f"{rec['first_name']} {rec['last_name']}".lower()
         if q == full or q == rec['first_name'].lower() or q == rec['last_name'].lower():
             matches.append((idx, rec))
+
     if not matches:
         return await ctx.send(f"No player found matching `{query}`.")
 
-    # if multiple matches (e.g. same last name), list them all
+    # Prepare response lines
+    id_pattern = re.compile(r'^event_(\d+)_id$')
     lines = []
     for rank, rec in matches:
         name  = f"{rec['first_name']} {rec['last_name']}"
         score = rec['top4_sum']
-        lines.append(f"#{rank}  **{name}** — {score} pts")
+        # Count how many non-empty event_i_id fields
+        total_events = sum(
+            1 for k, v in rec.items()
+            if id_pattern.match(k) and v
+        )
+        # Cap at 4 for display
+        display_count = min(total_events, 4)
+        lines.append(f"#{rank}  **{name}** — {score} pts ({display_count} of 4)")
+
     await ctx.send("\n".join(lines))
 
 if __name__ == "__main__":
