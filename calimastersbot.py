@@ -33,7 +33,7 @@ async def top8(ctx):
         lines.append(f"{i}. **{name}** — {score} pts")
     await ctx.send("\n".join(lines))
 
-COMMON_WORDS = top_n_list("en", n_top=20000)
+COMMON_WORDS = top_n_list("en", 20000)
 WORDS_BY_LETTER = {
     ch: [w.capitalize() for w in COMMON_WORDS if w.startswith(ch)]
     for ch in "abcdefghijklmnopqrstuvwxyz"
