@@ -60,6 +60,9 @@ async def rank(ctx, *, query: str):
     if query.strip().upper() == 'TSD':
         expansion = random_acronym('TSD')
         return await ctx.send(f"`TSD` stands for: **{expansion}**")
+
+    if query.strip().lower() == 'ligmar':
+        return await ctx.send('BALLS!')
     
     # Fetch leaderboard
     async with aiohttp.ClientSession() as session:
