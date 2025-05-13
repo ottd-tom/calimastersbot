@@ -2,6 +2,8 @@ import os
 import discord
 from discord.ext import commands
 import aiohttp
+import re
+from wordfreq import top_n_list
 
 intents = discord.Intents.default()
 intents.message_content = True   # so the bot can read message content for prefix commands
@@ -29,8 +31,22 @@ async def top8(ctx):
         score = rec['top4_sum']
         lines.append(f"{i}. **{name}** — {score} pts")
     await ctx.send("\n".join(lines))
-    
-import re
+
+COMMON_WORDS = top_n_list("en", n_top=20000)
+WORDS_BY_LETTER = {
+    ch: [w.capitalize() for w in COMMON_WORDS if w.startswith(ch)]
+    for ch in "abcdefghijklmnopqrstuvwxyz"
+}
+
+def random_acronym(letters: str) -> str:
+    parts = []
+    for ch in letters.lower():
+        bucket = WORDS_BY_LETTER.get(ch)
+        if bucket:
+            parts.append(random.choice(bucket))
+        else:
+            parts.append(ch.upper())
+    return " ".join(parts)
 
 @bot.command(name='rank', help='Show current rank, score, and event count for a specific player')
 async def rank(ctx, *, query: str):
@@ -40,6 +56,10 @@ async def rank(ctx, *, query: str):
     if query.strip().lower() == 'corsairs':
         return await ctx.send('utter trash')
 
+    if query.strip().upper() == 'TSD':
+        expansion = random_acronym('TSD')
+        return await ctx.send(f"`TSD` stands for: **{expansion}**")
+    
     # Fetch leaderboard
     async with aiohttp.ClientSession() as session:
         async with session.get(LEADERBOARD_URL) as resp:
