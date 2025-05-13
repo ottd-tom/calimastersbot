@@ -98,6 +98,8 @@ async def rank(ctx, *, query: str):
         return await ctx.send(f"`TSD` stands for: **{random_acronym('TSD')}**")
     if key == 'ligmar':
         return await ctx.send('BALLS!')
+    if key == 'jessica':
+        return await ctx.send('Best Corsair')
 
     data = await fetch_json(LEADERBOARD_URL)
     pattern = re.compile(r'^event_(\d+)_id$')
