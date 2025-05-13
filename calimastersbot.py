@@ -31,6 +31,33 @@ async def top8(ctx):
         score = rec['top4_sum']
         lines.append(f"{i}. **{name}** — {score} pts")
     await ctx.send("\n".join(lines))
+    
+@bot.command(name='rank', help='Show current rank & score for a specific player')
+async def rank(ctx, *, query: str):
+    """Usage: !rank <player name>"""
+    async with aiohttp.ClientSession() as session:
+        async with session.get(LEADERBOARD_URL) as resp:
+            if resp.status != 200:
+                return await ctx.send(f"Error fetching leaderboard (HTTP {resp.status})")
+            data = await resp.json()
+
+    # case-insensitive match on full name, first or last
+    matches = []
+    q = query.strip().lower()
+    for idx, rec in enumerate(data, start=1):
+        full = f"{rec['first_name']} {rec['last_name']}".lower()
+        if q == full or q == rec['first_name'].lower() or q == rec['last_name'].lower():
+            matches.append((idx, rec))
+    if not matches:
+        return await ctx.send(f"No player found matching `{query}`.")
+
+    # if multiple matches (e.g. same last name), list them all
+    lines = []
+    for rank, rec in matches:
+        name  = f"{rec['first_name']} {rec['last_name']}"
+        score = rec['top4_sum']
+        lines.append(f"#{rank}  **{name}** — {score} pts")
+    await ctx.send("\n".join(lines))
 
 if __name__ == "__main__":
     TOKEN = os.getenv("DISCORD_TOKEN")
