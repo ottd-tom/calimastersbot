@@ -6,10 +6,8 @@ import aiohttp
 intents = discord.Intents.default()
 intents.message_content = True   # so the bot can read message content for prefix commands
 
-# 2) Pass intents into Bot
 bot = commands.Bot(command_prefix='!', intents=intents)
 
-# Replace with your actual API URL
 LEADERBOARD_URL = 'https://aos-events.com/api/california_itc_scores'
 
 @bot.command(name='top8', help='Show the current Cali Masters top 8')
