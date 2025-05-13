@@ -3,6 +3,7 @@ import discord
 from discord.ext import commands
 import aiohttp
 import re
+import random
 from wordfreq import top_n_list
 
 intents = discord.Intents.default()
