@@ -264,6 +264,21 @@ async def itcrank_cmd(ctx, *, name: str):
         resp = f"```\n{resp}\n```"
     await ctx.send(resp)
 
+aos_bot.remove_command('help')
+@aos_bot.command(name='help', help='List all AoS bot commands')
+async def help_cmd(ctx):
+    lines = ["**AoS Win Rates Bot Commands**"]
+    lines.append("!winrates [time_filter] - Full faction win rates")
+    lines.append("!winrates <faction_alias> [time_filter] - Single faction win rate")
+    lines.append("!artefacts <faction_alias> [time_filter] - Artifact win rates")
+    lines.append("!traits <faction_alias> [time_filter] - Trait win rates")
+    lines.append("!formations <faction_alias> [time_filter] - Formation win rates")
+    lines.append("!itcrank <player_name> - ITC placing and points")
+    lines.append("")
+    lines.append("Time filters: all (Since 2025/01/01), recent (Last 60 days), battlescroll (Since last battlescroll)")
+    lines.append("")
+    lines.append("Source: https://aos-events.com")
+    await send_lines(ctx, lines)
 
 async def send_full_list(ctx, time_filter):
     data = await fetch_winrates(time_filter)
