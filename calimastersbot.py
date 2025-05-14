@@ -6,6 +6,7 @@ import asyncio
 import logging
 import re
 import random
+import urllib.parse
 from wordfreq import top_n_list
 
 # Enable logging
@@ -230,6 +231,39 @@ async def formations_cmd(ctx, faction_alias: str, time_filter: str = 'all'):
     lines.append('')
     lines.append('Source: https://aos-events.com')
     await send_lines(ctx, lines)
+
+async def fetch_itc_placings(name: str):
+    """Call your Flask API to get ITC placings for a given name."""
+    base = api_url.rstrip('/')
+    q = urllib.parse.quote(name)
+    url = f"{base}/api/itc_placings?name={q}"
+    return await fetch_json(url)
+
+@aos_bot.command(name='itcrank', help='Show ITC placing and points for a player')
+async def itcrank_cmd(ctx, *, name: str):
+    name = name.strip()
+    if not name:
+        return await ctx.send("Usage: `!itcrank First [Last]`")
+    try:
+        data = await fetch_itc_placings(name)
+    except Exception as e:
+        return await ctx.send(f"Error fetching ITC data: {e}")
+    if not data:
+        return await ctx.send(f"No ITC placings found for **{name}**.")
+    # Build the response
+    lines = [f"**ITC Placings for “{name}”**"]
+    for rec in data:
+        fn = rec.get('first_name', '')
+        ln = rec.get('last_name', '')
+        placing   = rec.get('placing')
+        points    = rec.get('itc_points')
+        lines.append(f"{fn} {ln} — Placing: {placing}, Points: {points:.2f}")
+    # wrap in a code block if multi-line
+    resp = "\n".join(lines)
+    if len(lines) > 1:
+        resp = f"```\n{resp}\n```"
+    await ctx.send(resp)
+
 
 async def send_full_list(ctx, time_filter):
     data = await fetch_winrates(time_filter)
