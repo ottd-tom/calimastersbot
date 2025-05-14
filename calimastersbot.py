@@ -126,7 +126,7 @@ ALIAS_MAP = {
     'sons': 'Sons of Behemat', 'sob': 'Sons of Behemat',
     'trees': 'Sylvaneth', 'sylvaneth': 'Sylvaneth',
     'lizards': 'Seraphon', 'seraphon': 'Seraphon',
-    'sbgl': 'Soulblight Gravelords', 'soulblight', 'vampires': 'Soulblight Gravelords',
+    'sbgl': 'Soulblight Gravelords', 'soulblight' : 'Soulblight Gravelords', 'vampires': 'Soulblight Gravelords',
     'bok': 'Blades of Khorne', 'khorne': 'Blades of Khorne',
     'sce': 'Stormcast Eternals', 'stormcast': 'Stormcast Eternals',
     'hos': 'Hedonites of Slaanesh', 'slaanesh': 'Hedonites of Slaanesh',
