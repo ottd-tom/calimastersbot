@@ -157,6 +157,8 @@ ALIAS_MAP = {
     'fs': 'Fyreslayers', 'fyreslayers': 'Fyreslayers',
     'gitz': 'Gloomspite Gitz', 'gloomspite gitz': 'Gloomspite Gitz'
 }
+for full in set(ALIAS_MAP.values()):
+    ALIAS_MAP[full.lower()] = full
 
 @aos_bot.command(name='winrates', aliases=['winrate'], help='!winrates [time]|[faction_alias] [time]')
 async def winrates_cmd(ctx, arg: str = 'all', maybe_time: str = None):
