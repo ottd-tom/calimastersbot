@@ -25,6 +25,13 @@ intents.message_content = True
 leaderboard_bot = commands.Bot(command_prefix='!', intents=intents, description="Cali Masters Leaderboard Bot")
 aos_bot = commands.Bot(command_prefix='!', intents=intents, description="AoS Win Rates Bot")
 
+# Time filter display labels
+time_labels = {
+    'all': 'Since 2025/01/01',
+    'recent': 'Last 60 days',
+    'battlescroll': 'Since last battlescroll'
+}
+
 # Emoji mapping for factions
 EMOJI_MAP = {
     'Flesh-eater Courts': '🦴',
@@ -161,7 +168,7 @@ async def winrates_cmd(ctx, arg: str = 'all', maybe_time: str = None):
         await send_single(ctx, arg_lower, tf)
     else:
         await ctx.send(f"Invalid argument '{arg}'. Use a time ({', '.join(TIME_FILTERS)}) or alias.")
-        
+
 @aos_bot.command(name='artefacts', aliases=['artefact','artifact','artifacts'], help='Get artifact winrates for a faction. Usage: !artefacts <faction_alias> [time]')
 async def artefacts_cmd(ctx, faction_alias: str, time_filter: str = 'all'):
     tf = time_filter.lower()
@@ -174,7 +181,8 @@ async def artefacts_cmd(ctx, faction_alias: str, time_filter: str = 'all'):
     items = [i for i in data.get('artifacts', []) if i.get('faction') == canonical]
     if not items:
         return await ctx.send(f"No artifact data for {canonical}.")
-    lines = [f"Artifact Win Rates for {canonical} ({tf}):"]
+    label = time_labels.get(tf, tf)
+    lines = [f"Artifact Win Rates for {canonical} ({label}):"]
     for itm in items:
         lines.append(f"{itm['artifact']}: {itm['wins']}/{itm['games']} wins ({itm['win_rate_pct']:.2f}%)")
     lines.append('')
@@ -193,7 +201,8 @@ async def traits_cmd(ctx, faction_alias: str, time_filter: str = 'all'):
     items = [i for i in data.get('traits', []) if i.get('faction') == canonical]
     if not items:
         return await ctx.send(f"No trait data for {canonical}.")
-    lines = [f"Trait Win Rates for {canonical} ({tf}):"]
+    label = time_labels.get(tf, tf)
+    lines = [f"Trait Win Rates for {canonical} ({label}):"]
     for itm in items:
         lines.append(f"{itm['trait']}: {itm['wins']}/{itm['games']} wins ({itm['win_rate_pct']:.2f}%)")
     lines.append('')
@@ -212,18 +221,20 @@ async def formations_cmd(ctx, faction_alias: str, time_filter: str = 'all'):
     items = [i for i in data.get('formations', []) if i.get('faction') == canonical]
     if not items:
         return await ctx.send(f"No formation data for {canonical}.")
-    lines = [f"Formation Win Rates for {canonical} ({tf}):"]
+    label = time_labels.get(tf, tf)
+    lines = [f"Formation Win Rates for {canonical} ({label}):"]
     for itm in items:
         lines.append(f"{itm['formation']}: {itm['wins']}/{itm['games']} wins ({itm['win_rate_pct']:.2f}%)")
     lines.append('')
     lines.append('Source: https://aos-events.com')
     await send_lines(ctx, lines)
-    
+
 async def send_full_list(ctx, time_filter):
     data = await fetch_winrates(time_filter)
-    items = [f for f in data.get('factions', []) if f['name'] not in EXCLUDE_FACTIONS]
+    items = [f for f in data.get('factions', []) if f['name'] not in ['Beasts of Chaos','Bonesplitterz']]
     sorted_f = sorted(items, key=lambda f: (f['wins']/f['games'] if f['games'] else 0), reverse=True)
-    lines = [f"AoS Faction Win Rates ({time_filter}) sorted:"]
+    label = time_labels.get(time_filter, time_filter)
+    lines = [f"AoS Faction Win Rates ({label}) sorted:"]
     for f in sorted_f:
         pct = (f['wins']/f['games']*100) if f['games'] else 0
         emoji = EMOJI_MAP.get(f['name'], '')
@@ -231,15 +242,16 @@ async def send_full_list(ctx, time_filter):
     lines += ['', 'Source: https://aos-events.com']
     await send_lines(ctx, lines)
 
-async def send_single(ctx, key, tf):
+async def send_single(ctx, key, time_filter):
     name = ALIAS_MAP[key]
-    data = await fetch_winrates(tf)
-    f = next((x for x in data.get('factions', []) if x['name'] == name), None)
+    data = await fetch_winrates(time_filter)
+    f = next((x for x in data.get('factions', []) if x['name']==name), None)
     if not f:
         return await ctx.send(f"Faction '{name}' not found.")
     pct = (f['wins']/f['games']*100) if f['games'] else 0
     emoji = EMOJI_MAP.get(name, '')
-    await ctx.send(f"{emoji} **{name}** ({tf}): {f['wins']}/{f['games']} ({pct:.2f}%)\nSource: https://aos-events.com")
+    label = time_labels.get(time_filter, time_filter)
+    await ctx.send(f"{emoji} **{name}** ({label}): {f['wins']}/{f['games']} ({pct:.2f}%)\nSource: https://aos-events.com")
 
 async def send_lines(ctx, lines):
     chunks = []
