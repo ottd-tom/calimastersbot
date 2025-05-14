@@ -74,6 +74,12 @@ async def fetch_winrates(time_filter='all'):
     url = f"{base if base.lower().endswith('winrates') else base + '/api/winrates'}?time={time_filter}"
     return await fetch_json(url)
 
+
+async def fetch_enhancement(time_filter='all', rounds_filter='all'):
+    base = api_url.rstrip('/')
+    url = f"{base}/api/enhancement_winrates?time={time_filter}&rounds={rounds_filter}"
+    return await fetch_json(url)
+
 # ========== Leaderboard Bot Commands ==========
 @leaderboard_bot.command(name='top8', help='Show the current Cali Masters top 8')
 async def top8(ctx):
@@ -155,7 +161,64 @@ async def winrates_cmd(ctx, arg: str = 'all', maybe_time: str = None):
         await send_single(ctx, arg_lower, tf)
     else:
         await ctx.send(f"Invalid argument '{arg}'. Use a time ({', '.join(TIME_FILTERS)}) or alias.")
+        
+@aos_bot.command(name='artefacts', aliases=['artefact','artifact','artifacts'], help='Get artifact winrates for a faction. Usage: !artefacts <faction_alias> [time]')
+async def artefacts_cmd(ctx, faction_alias: str, time_filter: str = 'all'):
+    tf = time_filter.lower()
+    if tf not in TIME_FILTERS:
+        return await ctx.send(f"Invalid time filter. Choose from: {', '.join(TIME_FILTERS)}")
+    canonical = ALIAS_MAP.get(faction_alias.lower())
+    if not canonical:
+        return await ctx.send(f"Unknown faction '{faction_alias}'.")
+    data = await fetch_enhancement(tf)
+    items = [i for i in data.get('artifacts', []) if i.get('faction') == canonical]
+    if not items:
+        return await ctx.send(f"No artifact data for {canonical}.")
+    lines = [f"Artifact Win Rates for {canonical} ({tf}):"]
+    for itm in items:
+        lines.append(f"{itm['artifact']}: {itm['wins']}/{itm['games']} wins ({itm['win_rate_pct']:.2f}%)")
+    lines.append('')
+    lines.append('Source: https://aos-events.com')
+    await send_lines(ctx, lines)
 
+@aos_bot.command(name='traits', aliases=['trait'], help='Get trait winrates for a faction. Usage: !traits <faction_alias> [time]')
+async def traits_cmd(ctx, faction_alias: str, time_filter: str = 'all'):
+    tf = time_filter.lower()
+    if tf not in TIME_FILTERS:
+        return await ctx.send(f"Invalid time filter. Choose from: {', '.join(TIME_FILTERS)}")
+    canonical = ALIAS_MAP.get(faction_alias.lower())
+    if not canonical:
+        return await ctx.send(f"Unknown faction '{faction_alias}'.")
+    data = await fetch_enhancement(tf)
+    items = [i for i in data.get('traits', []) if i.get('faction') == canonical]
+    if not items:
+        return await ctx.send(f"No trait data for {canonical}.")
+    lines = [f"Trait Win Rates for {canonical} ({tf}):"]
+    for itm in items:
+        lines.append(f"{itm['trait']}: {itm['wins']}/{itm['games']} wins ({itm['win_rate_pct']:.2f}%)")
+    lines.append('')
+    lines.append('Source: https://aos-events.com')
+    await send_lines(ctx, lines)
+
+@aos_bot.command(name='formations', aliases=['formation'], help='Get formation winrates for a faction. Usage: !formations <faction_alias> [time]')
+async def formations_cmd(ctx, faction_alias: str, time_filter: str = 'all'):
+    tf = time_filter.lower()
+    if tf not in TIME_FILTERS:
+        return await ctx.send(f"Invalid time filter. Choose from: {', '.join(TIME_FILTERS)}")
+    canonical = ALIAS_MAP.get(faction_alias.lower())
+    if not canonical:
+        return await ctx.send(f"Unknown faction '{faction_alias}'.")
+    data = await fetch_enhancement(tf)
+    items = [i for i in data.get('formations', []) if i.get('faction') == canonical]
+    if not items:
+        return await ctx.send(f"No formation data for {canonical}.")
+    lines = [f"Formation Win Rates for {canonical} ({tf}):"]
+    for itm in items:
+        lines.append(f"{itm['formation']}: {itm['wins']}/{itm['games']} wins ({itm['win_rate_pct']:.2f}%)")
+    lines.append('')
+    lines.append('Source: https://aos-events.com')
+    await send_lines(ctx, lines)
+    
 async def send_full_list(ctx, time_filter):
     data = await fetch_winrates(time_filter)
     items = [f for f in data.get('factions', []) if f['name'] not in EXCLUDE_FACTIONS]
