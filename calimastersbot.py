@@ -14,7 +14,7 @@ logging.basicConfig(level=logging.INFO)
 # Load environment variables for both bots
 token_leaderboard = os.getenv('DISCORD_TOKEN')
 token_aos = os.getenv('DISCORD_TOKEN_AOSEVENTS')
-api_url = "https://aos-events.com/api/winrates"
+api_url = "https://aos-events.com"
 LEADERBOARD_URL = 'https://aos-events.com/api/california_itc_scores'
 
 # Shared settings
