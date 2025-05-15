@@ -320,6 +320,16 @@ async def help_cmd(ctx):
     lines.append("Source: https://aos-events.com")
     await send_lines(ctx, lines)
 
+
+@bot.command(name='servers', help='List all servers this bot is in')
+async def servers(ctx):
+    guilds = bot.guilds
+    if not guilds:
+        return await ctx.send("I'm not in any servers!")
+    lines = [f"• {g.name} (ID: {g.id})" for g in guilds]
+    # Send as a code block to preserve formatting
+    await ctx.send("```" + "\n".join(lines) + "```")
+
 async def send_full_list(ctx, time_filter):
     data = await fetch_winrates(time_filter)
     items = [f for f in data.get('factions', []) if f['name'] not in ['Beasts of Chaos','Bonesplitterz']]
