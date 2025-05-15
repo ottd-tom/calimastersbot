@@ -250,7 +250,8 @@ async def itcrank_cmd(ctx, *, name: str):
         return await ctx.send(f"Error fetching ITC data: {e}")
     if not data:
         return await ctx.send(f"No ITC placings found for **{name}**.")
-    # Build the response
+
+    # Build a list of lines rather than one giant string
     lines = [f"**ITC Placings for “{name}”**"]
     for rec in data:
         fn = rec.get('first_name', '')
@@ -258,11 +259,9 @@ async def itcrank_cmd(ctx, *, name: str):
         placing   = rec.get('placing')
         points    = rec.get('itc_points')
         lines.append(f"{fn} {ln} — Placing: {placing}, Points: {points:.2f}")
-    # wrap in a code block if multi-line
-    resp = "\n".join(lines)
-    if len(lines) > 1:
-        resp = f"```\n{resp}\n```"
-    await ctx.send(resp)
+
+    # Then use your paginator
+    await send_lines(ctx, lines)
 
 aos_bot.remove_command('help')
 @aos_bot.command(name='help', help='List all AoS bot commands')
