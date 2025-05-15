@@ -441,9 +441,13 @@ async def masonsdad(ctx):
 @aos_bot.command(name='servers', help='List all servers this bot is in')
 async def servers(ctx):
     guilds = aos_bot.guilds
+    count = len(guilds)
     if not guilds:
         return await ctx.send("I'm not in any servers!")
-    lines = [f"• {g.name} (ID: {g.id})" for g in guilds]
+    # Build numbered list with total count in the title
+    lines = [f"Servers I'm in ({count}):"]
+    for idx, g in enumerate(guilds, start=1):
+        lines.append(f"{idx}. {g.name} (ID: {g.id})")
     # Send as a code block to preserve formatting
     await ctx.send("```" + "\n".join(lines) + "```")
 
