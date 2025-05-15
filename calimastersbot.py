@@ -343,7 +343,7 @@ async def hof(ctx, alias: str):
 aos_bot.remove_command('help')
 @aos_bot.command(name='help', help='List all AoS bot commands')
 async def help_cmd(ctx):
-    lines = ["**AoS Win Rates Bot Commands**"]
+    lines = ["**AoS Events Bot Commands**"]
     lines.append("!winrates [time_filter] - Full faction win rates")
     lines.append("!winrates <faction_alias> [time_filter] - Single faction win rate")
     lines.append("!artefacts <faction_alias> [time_filter] - Artifact win rates")
