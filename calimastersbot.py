@@ -260,8 +260,44 @@ async def itcrank_cmd(ctx, *, name: str):
         points    = rec.get('itc_points')
         lines.append(f"{fn} {ln} — Placing: {placing}, Points: {points:.2f}")
 
-    # Then use your paginator
     await send_lines(ctx, lines)
+
+@aos_bot.command(name='whoisbetter', help='Compare two players by ITC placing')
+async def whoisbetter_cmd(ctx, first1: str, last1: str, first2: str, last2: str):
+    name1 = f"{first1} {last1}"
+    name2 = f"{first2} {last2}"
+
+    # Special case for Gareth Thomas
+    if name1.lower() == "gareth thomas" or name2.lower() == "gareth thomas":
+        return await ctx.send("Gareth Thomas is morally and intellectually superior")
+
+    try:
+        data1 = await fetch_itc_placings(name1)
+        data2 = await fetch_itc_placings(name2)
+    except Exception as e:
+        return await ctx.send(f"Error fetching ITC data: {e}")
+
+    def best_placing(data):
+        if not data:
+            return None
+        return min(rec.get('placing', float('inf')) for rec in data)
+
+    best1 = best_placing(data1)
+    best2 = best_placing(data2)
+
+    if best1 is None and best2 is None:
+        return await ctx.send(f"No ITC data for either {name1} or {name2}.")
+    if best1 is None:
+        return await ctx.send(f"No ITC data for {name1}, but {name2} has best placing #{best2}. So {name2} is better!")
+    if best2 is None:
+        return await ctx.send(f"No ITC data for {name2}, but {name1} has best placing #{best1}. So {name1} is better!")
+    if best1 < best2:
+        return await ctx.send(f"{name1} (best placing #{best1}) is better than {name2} (best placing #{best2})!")
+    elif best2 < best1:
+        return await ctx.send(f"{name2} (best placing #{best2}) is better than {name1} (best placing #{best1})!")
+    else:
+        return await ctx.send(f"Both {name1} and {name2} share the same best placing of #{best1}! They're tied!")
+
 
 aos_bot.remove_command('help')
 @aos_bot.command(name='help', help='List all AoS bot commands')
