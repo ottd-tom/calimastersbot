@@ -328,6 +328,33 @@ async def help_cmd(ctx):
     lines.append("Source: https://aos-events.com")
     await send_lines(ctx, lines)
 
+@aos_bot.command(name='hof', help='List Hall of Fame players (5+ wins) for a faction. Usage: !hof <faction_alias>')
+async def hof(ctx, alias: str):
+    lookup = alias.lower()
+    canonical = alias_map.get(lookup)
+    if not canonical:
+        return await ctx.send(f"Unknown faction '{alias}'. Available aliases: {', '.join(alias_map.keys())}")
+
+    # Fetch Hall of Fame entries
+    url = f"{api_url.rstrip('/')}/api/five_win_players"
+    data = await fetch_json(url)
+    entries = [e for e in data if e.get('faction') == canonical]
+
+    if not entries:
+        return await ctx.send(f"No Hall of Fame entries for {canonical}.")
+
+    # Build output lines
+    lines = [f"🏆 Hall of Fame for {canonical} 🏆"]
+    for e in entries:
+        date = e.get('event_date', '').split('T')[0]
+        lines.append(f"{date} - {e.get('player_name')} at {e.get('event_name')} (Wins: {e.get('wins')})")
+
+    # Add website link
+    lines.append("")
+    lines.append("For lists and more info: https://aos-events.com/faction_stats#hof")
+
+    # Send as code blocks
+    await send_lines(ctx, lines)
 
 @aos_bot.command(name='servers', help='List all servers this bot is in')
 async def servers(ctx):
