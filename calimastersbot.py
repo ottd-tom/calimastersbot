@@ -358,6 +358,10 @@ async def help_cmd(ctx):
     await send_lines(ctx, lines)
 
 
+@aos_bot.command(name='areyoumasonsdad', help='no help')
+async def masonsdad(ctx):
+    lines = ["Who knows, could be, could be.  Was a wild time.  Could be me, could be any of the other ten bots."]
+    await send_lines(ctx, lines)
 
 @aos_bot.command(name='servers', help='List all servers this bot is in')
 async def servers(ctx):
