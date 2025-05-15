@@ -312,22 +312,6 @@ async def whoisbetter_cmd(ctx, first1: str, last1: str, first2: str, last2: str)
         return await ctx.send(f"Both {name1} and {name2} share the same best placing of #{best1}! They're tied!")
 
 
-aos_bot.remove_command('help')
-@aos_bot.command(name='help', help='List all AoS bot commands')
-async def help_cmd(ctx):
-    lines = ["**AoS Win Rates Bot Commands**"]
-    lines.append("!winrates [time_filter] - Full faction win rates")
-    lines.append("!winrates <faction_alias> [time_filter] - Single faction win rate")
-    lines.append("!artefacts <faction_alias> [time_filter] - Artifact win rates")
-    lines.append("!traits <faction_alias> [time_filter] - Trait win rates")
-    lines.append("!formations <faction_alias> [time_filter] - Formation win rates")
-    lines.append("!itcrank <player_name> - ITC placing and points")
-    lines.append("")
-    lines.append("Time filters: all (Since 2025/01/01), recent (Last 60 days), battlescroll (Since last battlescroll)")
-    lines.append("")
-    lines.append("Source: https://aos-events.com")
-    await send_lines(ctx, lines)
-
 @aos_bot.command(name='hof', help='List Hall of Fame players (5+ wins) for a faction. Usage: !hof <faction_alias>')
 async def hof(ctx, alias: str):
     lookup = alias.lower()
@@ -355,6 +339,25 @@ async def hof(ctx, alias: str):
 
     # Send as code blocks
     await send_lines(ctx, lines)
+
+aos_bot.remove_command('help')
+@aos_bot.command(name='help', help='List all AoS bot commands')
+async def help_cmd(ctx):
+    lines = ["**AoS Win Rates Bot Commands**"]
+    lines.append("!winrates [time_filter] - Full faction win rates")
+    lines.append("!winrates <faction_alias> [time_filter] - Single faction win rate")
+    lines.append("!artefacts <faction_alias> [time_filter] - Artifact win rates")
+    lines.append("!traits <faction_alias> [time_filter] - Trait win rates")
+    lines.append("!formations <faction_alias> [time_filter] - Formation win rates")
+    lines.append("!hof <faction_alias> - 5+ wins for a faction")
+    lines.append("!itcrank <player_name> - ITC placing and points")
+    lines.append("")
+    lines.append("Time filters: all (Since 2025/01/01), recent (Last 60 days), battlescroll (Since last battlescroll)")
+    lines.append("")
+    lines.append("Source: https://aos-events.com")
+    await send_lines(ctx, lines)
+
+
 
 @aos_bot.command(name='servers', help='List all servers this bot is in')
 async def servers(ctx):
