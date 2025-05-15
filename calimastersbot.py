@@ -186,7 +186,7 @@ async def artefacts_cmd(ctx, faction_alias: str, time_filter: str = 'all'):
     if not items:
         return await ctx.send(f"No artifact data for {canonical}.")
     label = time_labels.get(tf, tf)
-    lines = [f"Artifact Win Rates for {canonical} ({label}):"]
+    lines = [f"🏹Artifact Win Rates for {canonical} ({label})🏹"]
     for itm in items:
         lines.append(f"{itm['artifact']}: {itm['wins']}/{itm['games']} wins ({itm['win_rate_pct']:.2f}%)")
     lines.append('')
@@ -206,7 +206,7 @@ async def traits_cmd(ctx, faction_alias: str, time_filter: str = 'all'):
     if not items:
         return await ctx.send(f"No trait data for {canonical}.")
     label = time_labels.get(tf, tf)
-    lines = [f"Trait Win Rates for {canonical} ({label}):"]
+    lines = [f"🏹Trait Win Rates for {canonical} ({label})🏹"]
     for itm in items:
         lines.append(f"{itm['trait']}: {itm['wins']}/{itm['games']} wins ({itm['win_rate_pct']:.2f}%)")
     lines.append('')
@@ -226,7 +226,7 @@ async def formations_cmd(ctx, faction_alias: str, time_filter: str = 'all'):
     if not items:
         return await ctx.send(f"No formation data for {canonical}.")
     label = time_labels.get(tf, tf)
-    lines = [f"Formation Win Rates for {canonical} ({label}):"]
+    lines = [f"🏹 Formation Win Rates for {canonical} ({label})🏹"]
     for itm in items:
         lines.append(f"{itm['formation']}: {itm['wins']}/{itm['games']} wins ({itm['win_rate_pct']:.2f}%)")
     lines.append('')
@@ -386,9 +386,9 @@ async def units_cmd(ctx, alias: str, time_filter: str = 'all'):
         return (w / g) if g else 0
 
     units_sorted = sorted(units, key=win_pct, reverse=True)
-
+    label = time_labels.get(tf, tf)
     # Build the output lines
-    lines = [f"🏹 Unit Win-Rates for {canonical} ({tf}) 🏹"]
+    lines = [f"🏹 Unit Win-Rates for {canonical} ({label}) 🏹"]
     for u in units_sorted:
         wins = u.get('wins', 0)
         games = u.get('games', 0)
