@@ -135,7 +135,7 @@ TIME_FILTERS = ['all', 'recent', 'battlescroll']
 EXCLUDE_FACTIONS = ['Beasts of Chaos', 'Bonesplitterz']
 ALIAS_MAP = {
     'fec': 'Flesh-eater Courts', 'flesh-eater courts': 'Flesh-eater Courts',
-    'idk': 'Idoneth Deepkin', 'idoneth': 'Idoneth Deepkin', 'deepkin': 'Idoneth Deepkin',
+    'idk': 'Idoneth Deepkin', 'idoneth': 'Idoneth Deepkin', 'deepkin': 'Idoneth Deepkin', 'fish': 'Idoneth Deepkin',
     'lrl': 'Lumineth Realm-lords', 'lumineth': 'Lumineth Realm-lords', 'realm-lords': 'Lumineth Realm-lords',
     'dot': 'Disciples of Tzeentch', 'tzeentch': 'Disciples of Tzeentch',
     'sons': 'Sons of Behemat', 'sob': 'Sons of Behemat',
