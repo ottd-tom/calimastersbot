@@ -279,7 +279,7 @@ async def whoisbetter_cmd(ctx, first1: str, last1: str, first2: str, last2: str)
         )
 
     #Special case Jeremy L and Jeremy V
-    if name.lower() == "jeremy veysseire" and name2.lower() == "jeremy lefebvre":
+    if name1.lower() == "jeremy veysseire" and name2.lower() == "jeremy lefebvre":
         return await ctx.send(
             f"🏆 Technically Jeremy Lefebvre is best Jeremy due to being the only Jeremy to win at AoS worlds 🏆"
         )    
