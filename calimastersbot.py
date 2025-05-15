@@ -321,7 +321,7 @@ async def help_cmd(ctx):
     await send_lines(ctx, lines)
 
 
-@bot.command(name='servers', help='List all servers this bot is in')
+@aos_bot.command(name='servers', help='List all servers this bot is in')
 async def servers(ctx):
     guilds = bot.guilds
     if not guilds:
