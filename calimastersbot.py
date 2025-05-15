@@ -263,27 +263,43 @@ async def itcrank_cmd(ctx, *, name: str):
 
     await send_lines(ctx, lines)
 
-@aos_bot.command(name='whoisbetter', help='Compare two players by ITC placing')
-async def whoisbetter_cmd(ctx, first1: str, last1: str, first2: str, last2: str):
-    name1 = f"{first1} {last1}"
-    name2 = f"{first2} {last2}"
+@aos_bot.command(
+    name='whoisbetter',
+    help='Compare two players by ITC placing. Usage: !whoisbetter <name1> <name2> OR !whoisbetter <name1> or <name2>'
+)
+async def whoisbetter_cmd(ctx, *, query: str):
+    import re
 
-    # Special case for Gareth Thomas
+    # Try “or” syntax first
+    parts = re.split(r'\s+or\s+', query, flags=re.IGNORECASE)
+    if len(parts) == 2:
+        name1 = parts[0].strip()
+        name2 = parts[1].strip()
+    else:
+        # Fallback: split into four tokens
+        tokens = query.split()
+        if len(tokens) < 4:
+            return await ctx.send(
+                "Usage: `!whoisbetter <first1> <last1> <first2> <last2>` "
+                "or `!whoisbetter <name1> or <name2>`"
+            )
+        name1 = f"{tokens[0]} {tokens[1]}"
+        name2 = f"{tokens[2]} {tokens[3]}"
+
+    # Special cases
     if name1.lower() == "gareth thomas" or name2.lower() == "gareth thomas":
         return await ctx.send("Gareth Thomas is morally and intellectually superior")
-
-    #Special case Team USA
     if name1.lower() == "team usa" or name2.lower() == "team usa":
         return await ctx.send(
-            f"🏆 Team USA are World Champions! 🏆 USA! USA! USA! Fuck Yeah! (but {name2} is probably better in most other respects)"
+            "🏆 Team USA are World Champions! 🏆 USA! USA! USA! (but "
+            f"{name2 if name1.lower()=='team usa' else name1} is probably better in most other respects)"
+        )
+    if (name1.lower(), name2.lower()) == ("jeremy veysseire", "jeremy lefebvre"):
+        return await ctx.send(
+            "🏆 Technically Jeremy Lefebvre is best Jeremy due to being the only Jeremy to win at AoS worlds 🏆"
         )
 
-    #Special case Jeremy L and Jeremy V
-    if name1.lower() == "jeremy veysseire" and name2.lower() == "jeremy lefebvre":
-        return await ctx.send(
-            f"🏆 Technically Jeremy Lefebvre is best Jeremy due to being the only Jeremy to win at AoS worlds 🏆"
-        )    
-    
+    # Fetch ITC data
     try:
         data1 = await fetch_itc_placings(name1)
         data2 = await fetch_itc_placings(name2)
@@ -291,13 +307,12 @@ async def whoisbetter_cmd(ctx, first1: str, last1: str, first2: str, last2: str)
         return await ctx.send(f"Error fetching ITC data: {e}")
 
     def best_placing(data):
-        if not data:
-            return None
-        return min(rec.get('placing', float('inf')) for rec in data)
+        return None if not data else min(rec.get('placing', float('inf')) for rec in data)
 
     best1 = best_placing(data1)
     best2 = best_placing(data2)
 
+    # Compare results
     if best1 is None and best2 is None:
         return await ctx.send(f"No ITC data for either {name1} or {name2}.")
     if best1 is None:
@@ -306,10 +321,9 @@ async def whoisbetter_cmd(ctx, first1: str, last1: str, first2: str, last2: str)
         return await ctx.send(f"No ITC data for {name2}, but {name1} has best placing #{best1}. So {name1} is better!")
     if best1 < best2:
         return await ctx.send(f"{name1} (best placing #{best1}) is better than {name2} (best placing #{best2})!")
-    elif best2 < best1:
+    if best2 < best1:
         return await ctx.send(f"{name2} (best placing #{best2}) is better than {name1} (best placing #{best1})!")
-    else:
-        return await ctx.send(f"Both {name1} and {name2} share the same best placing of #{best1}! They're tied!")
+    return await ctx.send(f"Both {name1} and {name2} share the same best placing of #{best1}! They're tied!")
 
 
 @aos_bot.command(name='hof', help='List Hall of Fame players (5+ wins) for a faction. Usage: !hof <faction_alias>')
