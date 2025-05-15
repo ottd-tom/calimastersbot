@@ -329,7 +329,7 @@ async def hof(ctx, alias: str):
     lookup = alias.lower()
     canonical = ALIAS_MAP.get(lookup)
     if not canonical:
-        return await ctx.send(f"Unknown faction '{alias}'. Available aliases: {', '.join(alias_map.keys())}")
+        return await ctx.send(f"Unknown faction '{alias}'. Available aliases: {', '.join(ALIAS_MAP.keys())}")
 
     # Fetch Hall of Fame entries
     url = f"{api_url.rstrip('/')}/api/five_win_players"
