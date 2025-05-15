@@ -239,7 +239,7 @@ async def fetch_itc_placings(name: str):
     url = f"{base}/api/itc_placings?name={q}"
     return await fetch_json(url)
 
-@aos_bot.command(name='itcrank', help='Show ITC placing and points for a player')
+@aos_bot.command(name='itcrank', aliases=['crankit'], help='Show ITC placing and points for a player')
 async def itcrank_cmd(ctx, *, name: str):
     name = name.strip()
     if not name:
