@@ -21,6 +21,7 @@ LEADERBOARD_URL = 'https://aos-events.com/api/california_itc_scores'
 # Shared settings
 intents = discord.Intents.default()
 intents.message_content = True
+intents.guilds = True
 
 # Create two Bot instances
 leaderboard_bot = commands.Bot(command_prefix='!', intents=intents, description="Cali Masters Leaderboard Bot")
