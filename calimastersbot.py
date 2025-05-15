@@ -268,8 +268,6 @@ async def itcrank_cmd(ctx, *, name: str):
     help='Compare two players by ITC placing. Usage: !whoisbetter <name1> <name2> OR !whoisbetter <name1> or <name2>'
 )
 async def whoisbetter_cmd(ctx, *, query: str):
-    import re
-
     # Try “or” syntax first
     parts = re.split(r'\s+or\s+', query, flags=re.IGNORECASE)
     if len(parts) == 2:
