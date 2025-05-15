@@ -352,6 +352,49 @@ async def hof(ctx, alias: str):
     # Send as code blocks
     await send_lines(ctx, lines)
 
+@aos_bot.command(
+    name='units',
+    help='List unit win-rates for a faction. Usage: !units <faction_alias> [time_filter]'
+)
+async def units_cmd(ctx, alias: str, time_filter: str = 'all'):
+    lookup = alias.lower()
+    canonical = ALIAS_MAP.get(lookup)
+    if not canonical:
+        return await ctx.send(
+            f"Unknown faction '{alias}'. Available aliases: {', '.join(ALIAS_MAP.keys())}"
+        )
+
+    tf = time_filter.lower()
+    if tf not in TIME_FILTERS:
+        return await ctx.send(
+            f"Invalid time filter '{time_filter}'. Choose from: {', '.join(TIME_FILTERS)}"
+        )
+
+    # Fetch the winrates payload
+    url = f"{api_url.rstrip('/')}/api/winrates?time={tf}"
+    data = await fetch_json(url)
+
+    # Filter units by faction
+    units = [u for u in data.get('units', []) if u.get('faction') == canonical]
+    if not units:
+        return await ctx.send(f"No unit data for {canonical} ({tf}).")
+
+    # Build the output lines
+    lines = [f"🏹 Unit Win-Rates for {canonical} ({tf}) 🏹"]
+    for u in units:
+        wins = u.get('wins', 0)
+        games = u.get('games', 0)
+        pct = (wins / games * 100) if games else 0
+        lines.append(f"{u['name']}: {wins}/{games} wins ({pct:.2f}%)")
+
+    # Add link to more details
+    lines.append("")
+    lines.append("Full stats at: https://aos-events.com/faction_stats#units")
+
+    # Send as code blocks
+    await send_lines(ctx, lines)
+
+
 aos_bot.remove_command('help')
 @aos_bot.command(name='help', help='List all AoS bot commands')
 async def help_cmd(ctx):
@@ -361,6 +404,7 @@ async def help_cmd(ctx):
     lines.append("!artefacts <faction_alias> [time_filter] - Artifact win rates")
     lines.append("!traits <faction_alias> [time_filter] - Trait win rates")
     lines.append("!formations <faction_alias> [time_filter] - Formation win rates")
+    lines.append("!units <faction_alias> [time_filter] - Unit win rates")
     lines.append("!hof <faction_alias> - 5+ wins for a faction")
     lines.append("!itcrank <player_name> - ITC placing and points")
     lines.append("")
