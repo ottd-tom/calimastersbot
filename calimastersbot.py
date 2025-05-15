@@ -315,7 +315,7 @@ async def whoisbetter_cmd(ctx, first1: str, last1: str, first2: str, last2: str)
 @aos_bot.command(name='hof', help='List Hall of Fame players (5+ wins) for a faction. Usage: !hof <faction_alias>')
 async def hof(ctx, alias: str):
     lookup = alias.lower()
-    canonical = alias_map.get(lookup)
+    canonical = ALIAS_MAP.get(lookup)
     if not canonical:
         return await ctx.send(f"Unknown faction '{alias}'. Available aliases: {', '.join(alias_map.keys())}")
 
