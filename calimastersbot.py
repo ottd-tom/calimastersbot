@@ -272,11 +272,18 @@ async def whoisbetter_cmd(ctx, first1: str, last1: str, first2: str, last2: str)
     if name1.lower() == "gareth thomas" or name2.lower() == "gareth thomas":
         return await ctx.send("Gareth Thomas is morally and intellectually superior")
 
+    #Special case Team USA
     if name1.lower() == "team usa" or name2.lower() == "team usa":
         return await ctx.send(
             f"🏆 Team USA are World Champions! 🏆 USA! USA! USA! Fuck Yeah! (but {name2} is probably better in most other respects)"
         )
 
+    #Special case Jeremy L and Jeremy V
+    if name.lower() == "jeremy veysseire" and name2.lower() == "jeremy lefebvre":
+        return await ctx.send(
+            f"🏆 Technically Jeremy Lefebvre is best Jeremy due to being the only Jeremy to win at AoS worlds 🏆"
+        )    
+    
     try:
         data1 = await fetch_itc_placings(name1)
         data2 = await fetch_itc_placings(name2)
