@@ -379,20 +379,29 @@ async def units_cmd(ctx, alias: str, time_filter: str = 'all'):
     if not units:
         return await ctx.send(f"No unit data for {canonical} ({tf}).")
 
+    # Sort by win percentage descending
+    def win_pct(u):
+        w = u.get('wins', 0)
+        g = u.get('games', 0)
+        return (w / g) if g else 0
+
+    units_sorted = sorted(units, key=win_pct, reverse=True)
+
     # Build the output lines
     lines = [f"🏹 Unit Win-Rates for {canonical} ({tf}) 🏹"]
-    for u in units:
+    for u in units_sorted:
         wins = u.get('wins', 0)
         games = u.get('games', 0)
-        pct = (wins / games * 100) if games else 0
+        pct = win_pct(u) * 100
         lines.append(f"{u['name']}: {wins}/{games} wins ({pct:.2f}%)")
 
     # Add link to more details
     lines.append("")
     lines.append("Full stats at: https://aos-events.com/faction_stats#units")
 
-    # Send as code blocks
+    # Send as code block
     await send_lines(ctx, lines)
+
 
 
 aos_bot.remove_command('help')
