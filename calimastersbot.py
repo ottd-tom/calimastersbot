@@ -337,6 +337,10 @@ async def whoisbetter_cmd(ctx, *, query: str):
 @aos_bot.command(name='hof', help='List Hall of Fame players (5+ wins) for a faction. Usage: !hof <faction_alias>')
 async def hof(ctx, alias: str):
     lookup = alias.lower()
+
+    if lookup == "legions of nagash":
+        return await ctx.send(f"Legions of Nagash are no longer legal, and as such do not have a Hall of Fame.  However, Gareth Thomas was the last winner of ITC LoN, so he is undoubtedly in the hall")
+    
     canonical = ALIAS_MAP.get(lookup)
     if not canonical:
         return await ctx.send(f"Unknown faction '{alias}'. Available aliases: {', '.join(ALIAS_MAP.keys())}")
