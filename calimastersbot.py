@@ -253,8 +253,9 @@ async def fetch_itc_placings(name: str):
 @aos_bot.command(name='itcrank', aliases=['crankit'], help='Show ITC placing and points for a player')
 async def itcrank_cmd(ctx, *, name: str):
     name = name.strip()
-    if not name:
-        return await ctx.send("Usage: `!itcrank First [Last]`")
+    # Enforce minimum length
+    if len(name) < 3:
+        return await ctx.send("Please provide at least 3 characters for the name search.")
     try:
         data = await fetch_itc_placings(name)
     except Exception as e:
@@ -267,8 +268,8 @@ async def itcrank_cmd(ctx, *, name: str):
     for rec in data:
         fn = rec.get('first_name', '')
         ln = rec.get('last_name', '')
-        placing   = rec.get('placing')
-        points    = rec.get('itc_points')
+        placing = rec.get('placing')
+        points = rec.get('itc_points')
         lines.append(f"{fn} {ln} — Placing: {placing}, Points: {points:.2f}")
 
     await send_lines(ctx, lines)
