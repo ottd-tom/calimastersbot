@@ -417,6 +417,50 @@ async def units_cmd(ctx, alias: str, time_filter: str = 'all'):
     # Send as code block
     await send_lines(ctx, lines)
 
+@aos_bot.command(
+    name='popularity',
+    help='List popularity stats. Usage: !popularity [factions|manifestations|drops] [time_filter]'
+)
+async def popularity_cmd(ctx, arg: str = 'factions', maybe_time: str = 'all'):
+    # Define valid categories and time filters
+    valid_cats = ['factions', 'manifestations', 'drops']
+    time_filters = ['all', 'recent', 'battlescroll']
+
+    arg_lower = arg.lower()
+    # If first arg is actually a time filter, shift to default category
+    if arg_lower in time_filters:
+        category = 'factions'
+        time_filter = arg_lower
+    elif arg_lower in valid_cats:
+        category = arg_lower
+        tf = maybe_time.lower()
+        time_filter = tf if tf in time_filters else 'all'
+    else:
+        return await ctx.send(
+            f"Invalid category or time filter '{arg}'.\n"
+            f"Categories: {', '.join(valid_cats)}\n"
+            f"Time filters: {', '.join(time_filters)}"
+        )
+
+    # Fetch popularity data with time filter
+    url = f"{api_url.rstrip('/')}/api/popularity?time={time_filter}"
+    data = await fetch_json(url)
+    items = data.get(category, [])
+    if not items:
+        return await ctx.send(f"No popularity data for {category} ({time_filter}).")
+
+    # Sort descending by games
+    items_sorted = sorted(items, key=lambda x: x.get('games', 0), reverse=True)
+
+    # Build lines
+    lines = [f"📊 Popularity for {category.capitalize()} ({time_filter}):"]
+    for it in items_sorted:
+        lines.append(f"{it['name']}: {it['games']} games")
+
+    lines.append("")
+    lines.append("More info: https://aos-events.com/faction_stats#popularity")
+
+    await send_lines(ctx, lines)
 
 
 aos_bot.remove_command('help')
@@ -425,6 +469,8 @@ async def help_cmd(ctx):
     lines = ["**AoS Events Bot Commands**"]
     lines.append("!winrates [time_filter] - Full faction win rates")
     lines.append("!winrates <faction_alias> [time_filter] - Single faction win rate")
+    lines.append("!popularity [time_filter] - Faction popularity")
+    lines.append("!popularity manifestations [time_filter] - Manifestation popularity")
     lines.append("!artefacts <faction_alias> [time_filter] - Artifact win rates")
     lines.append("!traits <faction_alias> [time_filter] - Trait win rates")
     lines.append("!formations <faction_alias> [time_filter] - Formation win rates")
