@@ -176,7 +176,7 @@ for full in set(ALIAS_MAP.values()):
 async def winrates_cmd(ctx, arg: str = 'all', maybe_time: str = None):
     arg_lower = arg.lower()
     if arg_lower in TIME_FILTERS:
-        await send_full_list(ctx, arg_lower)
+        await send_full_winrates(ctx, arg_lower)
     elif arg_lower in ALIAS_MAP:
         tf = maybe_time.lower() if maybe_time and maybe_time.lower() in TIME_FILTERS else 'all'
         await send_single(ctx, arg_lower, tf)
@@ -450,12 +450,14 @@ async def popularity_cmd(ctx, arg: str = 'factions', maybe_time: str = 'all'):
     # Sort descending by games and compute percentages
     items_sorted = sorted(items, key=lambda x: x.get('games', 0), reverse=True)
     total_games = sum(it['games'] for it in items_sorted)
+    label = time_labels.get(tf, tf)
 
-    lines = [f"📊 Popularity for {category.capitalize()} ({time_filter}):"]
+    lines = [f"📊 Popularity for {category.capitalize()} ({label}):"]
     for it in items_sorted:
         games = it['games']
         pct = (games / total_games * 100) if total_games else 0
-        lines.append(f"{it['name']}: {games} games ({pct:.2f}%)")
+        prefix = (EMOJI_MAP.get(it['name'], '') + ' ') if cat == 'factions' else ''
+        lines.append(f"{prefix}{it['name']}: {games} games ({pct:.2f}%)")
 
     lines.append("")
     lines.append("More info: https://aos-events.com/faction_stats#popularity")
@@ -498,7 +500,7 @@ async def servers(ctx):
     # Send as a code block to preserve formatting
     await ctx.send("```" + "\n".join(lines) + "```")
 
-async def send_full_list(ctx, time_filter):
+async def send_full_winrates(ctx, time_filter):
     data = await fetch_winrates(time_filter)
     items = [f for f in data.get('factions', []) if f['name'] not in ['Beasts of Chaos','Bonesplitterz']]
     sorted_f = sorted(items, key=lambda f: (f['wins']/f['games'] if f['games'] else 0), reverse=True)
