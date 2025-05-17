@@ -419,15 +419,14 @@ async def units_cmd(ctx, alias: str, time_filter: str = 'all'):
 
 @aos_bot.command(
     name='popularity',
-    help='List popularity stats. Usage: !popularity [factions|manifestations|drops] [time_filter]'
+    aliases=['pop'],
+    help='List popularity stats. Usage: !pop [factions|manifestations|drops] [time_filter]'
 )
 async def popularity_cmd(ctx, arg: str = 'factions', maybe_time: str = 'all'):
-    # Define valid categories and time filters
     valid_cats = ['factions', 'manifestations', 'drops']
     time_filters = ['all', 'recent', 'battlescroll']
 
     arg_lower = arg.lower()
-    # If first arg is actually a time filter, shift to default category
     if arg_lower in time_filters:
         category = 'factions'
         time_filter = arg_lower
@@ -442,25 +441,27 @@ async def popularity_cmd(ctx, arg: str = 'factions', maybe_time: str = 'all'):
             f"Time filters: {', '.join(time_filters)}"
         )
 
-    # Fetch popularity data with time filter
     url = f"{api_url.rstrip('/')}/api/popularity?time={time_filter}"
     data = await fetch_json(url)
     items = data.get(category, [])
     if not items:
         return await ctx.send(f"No popularity data for {category} ({time_filter}).")
 
-    # Sort descending by games
+    # Sort descending by games and compute percentages
     items_sorted = sorted(items, key=lambda x: x.get('games', 0), reverse=True)
+    total_games = sum(it['games'] for it in items_sorted)
 
-    # Build lines
     lines = [f"📊 Popularity for {category.capitalize()} ({time_filter}):"]
     for it in items_sorted:
-        lines.append(f"{it['name']}: {it['games']} games")
+        games = it['games']
+        pct = (games / total_games * 100) if total_games else 0
+        lines.append(f"{it['name']}: {games} games ({pct:.2f}%)")
 
     lines.append("")
     lines.append("More info: https://aos-events.com/faction_stats#popularity")
 
     await send_lines(ctx, lines)
+
 
 
 aos_bot.remove_command('help')
