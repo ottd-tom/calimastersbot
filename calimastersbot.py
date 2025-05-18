@@ -477,70 +477,139 @@ def extract_players(raw: dict):
             return raw['data']
     return []
 
-# ─── shared helper ────────────────────────────────────────────────────────────
+# ─── shared helper (needs to be defined once) ────────────────────────────────
 async def send_standings_table(ctx, ev_name, ev_id, players, metric_names):
-    """
-    Builds and sends a markdown table:
-      Place | Name | <metric1> | <metric2> | …
-    where metric_names is a list like ["Wins","Swiss SoS",…].
-    """
-    # header
     header_fields = ["Place", "Name"] + metric_names
     header_line   = " | ".join(header_fields)
     divider       = "-" * len(header_line)
 
-    lines = [f"Standings for {ev_name} ({ev_id}):", header_line, divider]
+    lines = [
+        f"Standings for {ev_name} ({ev_id}):",
+        header_line,
+        divider
+    ]
 
     for p in players:
         placing    = p.get("placing","")
         user       = p.get("user",{})
         name       = f"{user.get('firstName','')} {user.get('lastName','')}".strip()
-        metric_map = {m['name']: m['value'] for m in p.get("metrics",[])}
+        metric_map = {m['name']: m['value'] for m in p.get('metrics',[])}
         row = [str(placing), name] + [str(metric_map.get(m,"")) for m in metric_names]
         lines.append(" | ".join(row))
 
     await send_lines(ctx, lines)
 
 
-# ─── full standings (was !standings) ─────────────────────────────────────────
+# ─── !standingsfull ─────────────────────────────────────────────────────────
 @aos_bot.command(name='standingsfull')
 async def standings_full(ctx, *, query: str):
-    # … same fetch & filter logic as before …
+    today, week_ago = datetime.utcnow().date(), datetime.utcnow().date() - timedelta(days=7)
+    params = {
+        "limit": 100, "sortAscending": "true", "sortKey": "eventDate",
+        "startDate": week_ago.isoformat(), "endDate": today.isoformat(),
+        "gameType": "4"
+    }
+    headers = {
+        'Accept': 'application/json',
+        'x-api-key': BCP_API_KEY,
+        'client-id': CLIENT_ID,
+        'User-Agent': 'AoSBot',
+    }
+
     async with aiohttp.ClientSession() as session:
-        # fetch & filter events into matches …
+        # 1) fetch full list
+        async with session.get(BASE_EVENT_URL, params=params, headers=headers) as resp:
+            if resp.status != 200:
+                return await ctx.send(f":warning: Failed to fetch events (HTTP {resp.status})")
+            events = (await resp.json()).get("data", [])
+
+        # 2) filter by name + non-team
+        matches = [
+            e for e in events
+            if not e.get("teamEvent", False)
+            and query.lower() in e.get("name", "").lower()
+        ]
+        if not matches:
+            return await ctx.send(f":mag: No non-team AoS events this week matching `{query}`.")
+
+        # 3) for each match, fetch players and show all metrics
         for e in matches:
             ev_name, ev_id = e["name"], e["id"]
-            # fetch raw players …
+
+            async with session.get(f"{BASE_EVENT_URL}/{ev_id}/players",
+                                   params={"placings":"true","limit":500},
+                                   headers=headers) as presp:
+                if presp.status != 200:
+                    await ctx.send(f":warning: Couldn’t fetch players for `{ev_name}` ({ev_id})")
+                    continue
+                raw = await presp.json()
+
             players = extract_players(raw)
             if not players:
                 await ctx.send(f":warning: No players found for `{ev_name}` ({ev_id}).")
                 continue
 
-            # dynamically collect *all* metric names
+            # all metric names from first player
             metric_names = [m["name"] for m in players[0].get("metrics",[])]
             await send_standings_table(ctx, ev_name, ev_id, players, metric_names)
 
 
-# ─── slim standings (new !standings) ─────────────────────────────────────────
+# ─── !standings ─────────────────────────────────────────────────────────────
 @aos_bot.command(name='standings')
 async def standings_slim(ctx, *, query: str):
-    # … same fetch & filter logic as before …
+    today, week_ago = datetime.utcnow().date(), datetime.utcnow().date() - timedelta(days=7)
+    params = {
+        "limit": 100, "sortAscending": "true", "sortKey": "eventDate",
+        "startDate": week_ago.isoformat(), "endDate": today.isoformat(),
+        "gameType": "4"
+    }
+    headers = {
+        'Accept': 'application/json',
+        'x-api-key': BCP_API_KEY,
+        'client-id': CLIENT_ID,
+        'User-Agent': 'AoSBot',
+    }
+
     async with aiohttp.ClientSession() as session:
-        # fetch & filter events into matches …
+        # 1) fetch full list
+        async with session.get(BASE_EVENT_URL, params=params, headers=headers) as resp:
+            if resp.status != 200:
+                return await ctx.send(f":warning: Failed to fetch events (HTTP {resp.status})")
+            events = (await resp.json()).get("data", [])
+
+        # 2) filter by name + non-team
+        matches = [
+            e for e in events
+            if not e.get("teamEvent", False)
+            and query.lower() in e.get("name", "").lower()
+        ]
+        if not matches:
+            return await ctx.send(f":mag: No non-team AoS events this week matching `{query}`.")
+
+        # 3) for each match, fetch players but only show Wins
         for e in matches:
             ev_name, ev_id = e["name"], e["id"]
-            # fetch raw players …
+
+            async with session.get(f"{BASE_EVENT_URL}/{ev_id}/players",
+                                   params={"placings":"true","limit":500},
+                                   headers=headers) as presp:
+                if presp.status != 200:
+                    await ctx.send(f":warning: Couldn’t fetch players for `{ev_name}` ({ev_id})")
+                    continue
+                raw = await presp.json()
+
             players = extract_players(raw)
             if not players:
                 await ctx.send(f":warning: No players found for `{ev_name}` ({ev_id}).")
                 continue
 
-            # only show “Wins” column
-            # verify it exists, otherwise warn
+            # check for Wins metric
             first_metrics = [m["name"] for m in players[0].get("metrics",[])]
             if "Wins" not in first_metrics:
-                return await ctx.send(f":warning: No “Wins” metric found for `{ev_name}` ({ev_id}).")
+                return await ctx.send(f":warning: No “Wins” metric in `{ev_name}` ({ev_id}).")
+
             await send_standings_table(ctx, ev_name, ev_id, players, ["Wins"])
+
 
 
 aos_bot.remove_command('help')
