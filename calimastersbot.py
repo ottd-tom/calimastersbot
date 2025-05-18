@@ -482,7 +482,6 @@ async def standings(ctx, *, query: str):
     today = datetime.utcnow().date()
     week_ago = today - timedelta(days=7)
 
-    # 1) fetch events in past week
     params = {
         "limit":        100,
         "sortAscending":"true",
@@ -504,22 +503,17 @@ async def standings(ctx, *, query: str):
                 return await ctx.send(f":warning: Failed to fetch events (HTTP {resp.status})")
             events = (await resp.json()).get("data", [])
 
-        # 2) filter by name and non-team
         matches = [
             e for e in events
             if not e.get("teamEvent", False)
             and query.lower() in e.get("name", "").lower()
         ]
-
         if not matches:
             return await ctx.send(f":mag: No non-team AoS events in the past week matching `{query}`.")
 
-        # 3) for each match, fetch placings and accumulate lines
         for e in matches:
-            ev_name = e["name"]
-            ev_id   = e["id"]
-
-            # fetch players?placings=true
+            ev_name, ev_id = e["name"], e["id"]
+            # fetch placings
             url = f"{BASE_EVENT_URL}/{ev_id}/players"
             async with session.get(url, params={"placings":"true","limit":500}, headers=headers) as presp:
                 if presp.status != 200:
@@ -532,19 +526,31 @@ async def standings(ctx, *, query: str):
                 await ctx.send(f":warning: No players found for `{ev_name}` ({ev_id}).")
                 continue
 
-            # build lines for this event
-            lines = [f"Standings for {ev_name} ({ev_id}):"]
-            for p in players:
-                user    = p.get("user", {})
-                fname   = user.get("firstName","")
-                lname   = user.get("lastName","")
-                placing = p.get("placing","N/A")
-                metrics = p.get("metrics",[])
-                met_str = ", ".join(f"{m['name']}={m['value']}" for m in metrics)
-                lines.append(f"{fname} {lname} | Place: {placing} | {met_str}")
+            # dynamic metric columns
+            metric_names = [m['name'] for m in players[0].get('metrics', [])]
 
-            # send in manageable chunks
+            # build the table lines
+            header_fields = ["Place", "Name"] + metric_names
+            header_line   = " | ".join(header_fields)
+            divider       = "-" * len(header_line)
+
+            lines = [
+                f"Standings for {ev_name} ({ev_id}):",
+                header_line,
+                divider
+            ]
+
+            for p in players:
+                placing    = p.get("placing", "")
+                user       = p.get("user", {})
+                name       = f"{user.get('firstName','')} {user.get('lastName','')}".strip()
+                metric_map = {m['name']: m['value'] for m in p.get('metrics', [])}
+
+                row = [str(placing), name] + [str(metric_map.get(col, "")) for col in metric_names]
+                lines.append(" | ".join(row))
+
             await send_lines(ctx, lines)
+
 
 aos_bot.remove_command('help')
 @aos_bot.command(name='help', help='List all AoS bot commands')
