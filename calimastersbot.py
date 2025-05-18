@@ -470,22 +470,18 @@ async def popularity_cmd(ctx, arg: str = 'factions', maybe_time: str = 'all'):
 
 @aos_bot.command(name='standings')
 async def standings(ctx, *, query: str):
-    """
-    Fetch events from the past week whose name contains `query`,
-    and reply with each event's name and ID.
-    """
-    # Calculate date window
+    # 1) Date window: past 7 days
     today = datetime.utcnow().date()
-    seven_days_ago = today - timedelta(days=7)
+    week_ago = today - timedelta(days=7)
 
-    # Build request
+    # 2) Fetch events in that window
     params = {
-        "limit":       100,
-        "sortAscending": "true",
-        "sortKey":     "eventDate",
-        "startDate":   seven_days_ago.isoformat(),
-        "endDate":     today.isoformat(),
-        "gameType":    "4",           # Age of Sigmar
+        "limit":        100,
+        "sortAscending":"true",
+        "sortKey":      "eventDate",
+        "startDate":    week_ago.isoformat(),
+        "endDate":      today.isoformat(),
+        "gameType":     "4",           # Age of Sigmar
     }
     headers = {
         'Accept':       'application/json',
@@ -494,26 +490,51 @@ async def standings(ctx, *, query: str):
         'User-Agent':   'AoSBot',
     }
 
-    # Fetch events
     async with aiohttp.ClientSession() as session:
         async with session.get(BASE_EVENT_URL, params=params, headers=headers) as resp:
             if resp.status != 200:
-                await ctx.send(f":warning: Error fetching events (HTTP {resp.status})")
-                return
-            payload = await resp.json()
+                return await ctx.send(f":warning: Failed to fetch events (HTTP {resp.status})")
+            events = (await resp.json()).get("data", [])
 
-    events = payload.get("data", [])
-    # Filter by substring
-    matches = [e for e in events if query.lower() in e.get("name", "").lower()]
+        # 3) Filter by name & teamEvent=false
+        matches = [
+            e for e in events
+            if not e.get("teamEvent", False)
+            and query.lower() in e.get("name", "").lower()
+        ]
 
-    # Build and send reply
-    if not matches:
-        await ctx.send(f":mag: No AoS events in the past week containing `{query}`.")
-    else:
-        lines = [f"**{e['name']}** — `{e['id']}`" for e in matches]
-        # Discord has a 2000-char limit; split if needed
-        response = "\n".join(lines)
-        await ctx.send(response)
+        if not matches:
+            return await ctx.send(f":mag: No non-team AoS events in the past week matching `{query}`.")
+
+        # 4) For each match, fetch placings and post
+        for e in matches:
+            ev_name = e["name"]
+            ev_id   = e["id"]
+
+            # fetch players with placings
+            players_url = f"{BASE_EVENT_URL}/{ev_id}/players"
+            params2 = {"placings": "true"}
+            async with session.get(players_url, params=params2, headers=headers) as presp:
+                if presp.status != 200:
+                    await ctx.send(f":warning: Couldn’t fetch players for `{ev_name}` ({ev_id})")
+                    continue
+                players = (await presp.json()).get("data", [])
+
+            # format each player line
+            lines = []
+            for p in players:
+                user    = p.get("user", {})
+                fname   = user.get("firstName", "")
+                lname   = user.get("lastName", "")
+                placing = p.get("placing", "N/A")
+                metrics = p.get("metrics", [])
+                met_str = ", ".join(f"{m['name']}={m['value']}" for m in metrics)
+                lines.append(f"{fname} {lname} | Place: {placing} | {met_str}")
+
+            # send as a single code-block
+            header = f"Standings for {ev_name} ({ev_id}):"
+            content = "\n".join(lines)
+            await ctx.send(f"```{header}\n{content}```")
 
 aos_bot.remove_command('help')
 @aos_bot.command(name='help', help='List all AoS bot commands')
