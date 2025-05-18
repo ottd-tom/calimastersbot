@@ -8,6 +8,7 @@ import re
 import random
 import urllib.parse
 from wordfreq import top_n_list
+from datetime import datetime, timedelta
 
 # Enable logging
 logging.basicConfig(level=logging.INFO)
