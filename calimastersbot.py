@@ -19,6 +19,7 @@ token_aos = os.getenv('DISCORD_TOKEN_AOSEVENTS')
 token_texas = os.getenv('TEXAS_DISCORD_BOT')
 api_url = "https://aos-events.com"
 LEADERBOARD_URL = 'https://aos-events.com/api/california_itc_scores'
+TEXASURL = 'https://aos-events.com/api/texas_itc_scores'
 BCP_API_KEY   = os.getenv("BCP_API_KEY")        
 CLIENT_ID     = os.getenv("BCP_CLIENT_ID")   
 BASE_EVENT_URL = 'https://newprod-api.bestcoastpairings.com/v1/events'
@@ -147,18 +148,18 @@ async def ramon(ctx):
 
 
 # ========== Texas Bot Commands ==========
-@tex_bot.command(name='top8', help='Show the current Cali Masters top 8')
+@tex_bot.command(name='top8', help='Show the current Texas Masters top 8')
 async def top8(ctx):
-    data = await fetch_json(LEADERBOARD_URL)
+    data = await fetch_json(TEXAS_URL)
     top = data[:8]
     if not top:
         return await ctx.send("No data available.")
-    lines = ["**🏆 Cali Masters Top 8 🏆**"]
+    lines = ["**🏆 Texas Masters Top 8 🏆**"]
     for i, rec in enumerate(top, 1):
         name = f"{rec['first_name']} {rec['last_name']}"
         lines.append(f"{i}. **{name}** — {rec['top4_sum']} pts")
     lines.append("")
-    lines.append("Full table: https://aos-events.com/calimasters")    
+    lines.append("Full table: https://aos-events.com/texmasters")    
     await ctx.send("\n".join(lines))
 
 @tex_bot.command(name='rank', help='Show rank, score, and event count for a player')
@@ -173,7 +174,7 @@ async def rank(ctx, *, query: str):
     if key == 'jessica':
         return await ctx.send('☠️ Best Corsair ☠️')
 
-    data = await fetch_json(LEADERBOARD_URL)
+    data = await fetch_json(TEXAS_URL)
     pattern = re.compile(r'^event_(\d+)_id$')
     matches = [(i, rec) for i, rec in enumerate(data, 1)
                if key in (f"{rec['first_name']} {rec['last_name']}".lower(), rec['first_name'].lower(), rec['last_name'].lower())]
