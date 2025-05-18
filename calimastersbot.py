@@ -175,23 +175,25 @@ ALIAS_MAP = {
 }
 for full in set(ALIAS_MAP.values()):
     ALIAS_MAP[full.lower()] = full
-
+    
 def get_shortest_alias(full_name: str) -> str:
     """
-    Given a canonical faction name, return the shortest alias (upper-cased)
-    from ALIAS_MAP, or fall back to the full name if none found.
+    Given a faction full name (from JSON), return the shortest alias
+    (upper-cased) whose canonical mapping (case-insensitive) matches it.
+    Otherwise return the original full_name.
     """
-    # collect all alias keys that map to this full_name, excluding the key that is the full_name itself
+    full_lower = full_name.lower()
+    # pick all alias keys whose mapped canonical name matches (case-insensitive)
     candidates = [
         alias for alias, canon in ALIAS_MAP.items()
-        if canon == full_name and alias.lower() != full_name.lower()
+        if canon.lower() == full_lower
+           # and exclude the trivial alias==full_name case
+           and alias.lower() != full_lower
     ]
-    if not candidates:
-        return full_name
-    # pick the shortest alias key, then uppercase it
-    shortest = min(candidates, key=len)
-    return shortest.upper()
-
+    if candidates:
+        shortest = min(candidates, key=len)
+        return shortest.upper()
+    return full_name
 
 @aos_bot.command(name='winrates', aliases=['winrate'], help='!winrates [time]|[faction_alias] [time]')
 async def winrates_cmd(ctx, arg: str = 'all', maybe_time: str = None):
