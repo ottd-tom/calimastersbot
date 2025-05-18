@@ -183,8 +183,8 @@ async def rank(ctx, *, query: str):
     lines = []
     for rank_pos, rec in matches:
         total = sum(1 for k, v in rec.items() if pattern.match(k) and v)
-        cnt = min(total, 4)
-        lines.append(f"#{rank_pos} **{rec['first_name']} {rec['last_name']}** — {rec['top4_sum']} pts ({cnt} of 4)")
+        cnt = min(total, 5)
+        lines.append(f"#{rank_pos} **{rec['first_name']} {rec['last_name']}** — {rec['top5_sum']} pts ({cnt} of 4)")
     await ctx.send("\n".join(lines))
 
 
