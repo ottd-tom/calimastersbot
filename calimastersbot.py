@@ -632,6 +632,8 @@ async def help_cmd(ctx):
     lines.append("!units <faction_alias> [time_filter] - Unit win rates")
     lines.append("!hof <faction_alias> - 5+ wins for a faction")
     lines.append("!itcrank <player_name> - ITC placing and points")
+    lines.append("!standings <event_search> - Current standings at event")
+    lines.append("!standingsfull <event_search> - Full standings info")
     lines.append("")
     lines.append("Time filters: all (Since 2025/01/01), recent (Last 60 days), battlescroll (Since last battlescroll)")
     lines.append("")
