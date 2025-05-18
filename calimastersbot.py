@@ -18,6 +18,9 @@ token_leaderboard = os.getenv('DISCORD_TOKEN')
 token_aos = os.getenv('DISCORD_TOKEN_AOSEVENTS')
 api_url = "https://aos-events.com"
 LEADERBOARD_URL = 'https://aos-events.com/api/california_itc_scores'
+BCP_API_KEY   = os.getenv("BCP_API_KEY")        
+CLIENT_ID     = os.getenv("BCP_CLIENT_ID")   
+BASE_EVENT_URL = 'https://newprod-api.bestcoastpairings.com/v1/events'
 
 # Shared settings
 intents = discord.Intents.default()
