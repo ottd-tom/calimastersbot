@@ -464,7 +464,52 @@ async def popularity_cmd(ctx, arg: str = 'factions', maybe_time: str = 'all'):
 
     await send_lines(ctx, lines)
 
+@aos_bot.command(name='standings')
+async def standings(ctx, *, query: str):
+    """
+    Fetch events from the past week whose name contains `query`,
+    and reply with each event's name and ID.
+    """
+    # Calculate date window
+    today = datetime.utcnow().date()
+    seven_days_ago = today - timedelta(days=7)
 
+    # Build request
+    params = {
+        "limit":       100,
+        "sortAscending": "true",
+        "sortKey":     "eventDate",
+        "startDate":   seven_days_ago.isoformat(),
+        "endDate":     today.isoformat(),
+        "gameType":    "4",           # Age of Sigmar
+    }
+    headers = {
+        'Accept':       'application/json',
+        'x-api-key':    BCP_API_KEY,
+        'client-id':    CLIENT_ID,
+        'User-Agent':   'AoSBot',
+    }
+
+    # Fetch events
+    async with aiohttp.ClientSession() as session:
+        async with session.get(BASE_EVENT_URL, params=params, headers=headers) as resp:
+            if resp.status != 200:
+                await ctx.send(f":warning: Error fetching events (HTTP {resp.status})")
+                return
+            payload = await resp.json()
+
+    events = payload.get("data", [])
+    # Filter by substring
+    matches = [e for e in events if query.lower() in e.get("name", "").lower()]
+
+    # Build and send reply
+    if not matches:
+        await ctx.send(f":mag: No AoS events in the past week containing `{query}`.")
+    else:
+        lines = [f"**{e['name']}** — `{e['id']}`" for e in matches]
+        # Discord has a 2000-char limit; split if needed
+        response = "\n".join(lines)
+        await ctx.send(response)
 
 aos_bot.remove_command('help')
 @aos_bot.command(name='help', help='List all AoS bot commands')
