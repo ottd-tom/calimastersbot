@@ -150,11 +150,11 @@ EXCLUDE_FACTIONS = ['Beasts of Chaos', 'Bonesplitterz']
 ALIAS_MAP = {
     'fec': 'Flesh-eater Courts', 'flesh-eater courts': 'Flesh-eater Courts',
     'idk': 'Idoneth Deepkin', 'idoneth': 'Idoneth Deepkin', 'deepkin': 'Idoneth Deepkin', 'fish': 'Idoneth Deepkin',
-    'lrl': 'Lumineth Realm-lords', 'lumineth': 'Lumineth Realm-lords', 'realm-lords': 'Lumineth Realm-lords',
+    'lrl': 'Lumineth Realm-lords', 'lumineth': 'Lumineth Realm-lords', 'realm-lords': 'Lumineth Realm-lords', 'Lumineth Realm-Lords' : 'Lumineth Realm-lords',
     'dot': 'Disciples of Tzeentch', 'tzeentch': 'Disciples of Tzeentch',
     'sons': 'Sons of Behemat', 'sob': 'Sons of Behemat',
     'trees': 'Sylvaneth', 'sylvaneth': 'Sylvaneth',
-    'lizards': 'Seraphon', 'seraphon': 'Seraphon',
+    'Sera': 'Seraphon', 'lizards': 'Seraphon', 'seraphon': 'Seraphon',
     'sbgl': 'Soulblight Gravelords', 'soulblight' : 'Soulblight Gravelords', 'vampires': 'Soulblight Gravelords',
     'bok': 'Blades of Khorne', 'khorne': 'Blades of Khorne',
     'sce': 'Stormcast Eternals', 'stormcast': 'Stormcast Eternals',
