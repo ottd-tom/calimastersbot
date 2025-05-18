@@ -574,6 +574,7 @@ async def standings_full(ctx, *, query: str):
             # all metric names from first player
             metric_names = [m["name"] for m in players[0].get("metrics",[])]
             await send_standings_table(ctx, ev_name, ev_id, players, metric_names)
+            await ctx.send(f"View full placings: https://www.bestcoastpairings.com/event/{ev_id}?active_tab=placings")
 
 
 @aos_bot.command(name='standings')
@@ -658,6 +659,7 @@ async def standings_slim(ctx, *, query: str):
                 )
 
             await send_lines(ctx, lines)
+            await ctx.send(f"View full placings: https://www.bestcoastpairings.com/event/{ev_id}?active_tab=placings")
 
 
 
