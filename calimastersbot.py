@@ -456,7 +456,7 @@ async def popularity_cmd(ctx, arg: str = 'factions', maybe_time: str = 'all'):
     for it in items_sorted:
         games = it['games']
         pct = (games / total_games * 100) if total_games else 0
-        prefix = (EMOJI_MAP.get(it['name'], '') + ' ') if cat == 'factions' else ''
+        prefix = (EMOJI_MAP.get(it['name'], '') + ' ') if category  == 'factions' else ''
         lines.append(f"{prefix}{it['name']}: {games} games ({pct:.2f}%)")
 
     lines.append("")
