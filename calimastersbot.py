@@ -157,7 +157,7 @@ async def top8(ctx):
     lines = ["**🏆 Texas Masters Top 8 🏆**"]
     for i, rec in enumerate(top, 1):
         name = f"{rec['first_name']} {rec['last_name']}"
-        lines.append(f"{i}. **{name}** — {rec['top4_sum']} pts")
+        lines.append(f"{i}. **{name}** — {rec['top5_sum']} pts")
     lines.append("")
     lines.append("Full table: https://aos-events.com/texmasters")    
     await ctx.send("\n".join(lines))
