@@ -16,6 +16,7 @@ logging.basicConfig(level=logging.INFO)
 # Load environment variables for both bots
 token_leaderboard = os.getenv('DISCORD_TOKEN')
 token_aos = os.getenv('DISCORD_TOKEN_AOSEVENTS')
+token_texas = os.getenv('TEXAS_DISCORD_BOT')
 api_url = "https://aos-events.com"
 LEADERBOARD_URL = 'https://aos-events.com/api/california_itc_scores'
 BCP_API_KEY   = os.getenv("BCP_API_KEY")        
@@ -30,6 +31,7 @@ intents.guilds = True
 # Create two Bot instances
 leaderboard_bot = commands.Bot(command_prefix='!', intents=intents, description="Cali Masters Leaderboard Bot")
 aos_bot = commands.Bot(command_prefix='!', intents=intents, description="AoS Win Rates Bot")
+tex_bot = commands.Bot(command_prefix='!', intents=intents, description="Texas Masters Leaderboard Bot")
 
 # Time filter display labels
 time_labels = {
@@ -142,6 +144,48 @@ async def ramon(ctx):
         "And although I've never served, I completely have more than enough PTSD to pass for the average veteran."
     ]
     await send_lines(ctx, lines)
+
+
+# ========== Texas Bot Commands ==========
+@tex_bot.command(name='top8', help='Show the current Cali Masters top 8')
+async def top8(ctx):
+    data = await fetch_json(LEADERBOARD_URL)
+    top = data[:8]
+    if not top:
+        return await ctx.send("No data available.")
+    lines = ["**🏆 Cali Masters Top 8 🏆**"]
+    for i, rec in enumerate(top, 1):
+        name = f"{rec['first_name']} {rec['last_name']}"
+        lines.append(f"{i}. **{name}** — {rec['top4_sum']} pts")
+    lines.append("")
+    lines.append("Full table: https://aos-events.com/calimasters")    
+    await ctx.send("\n".join(lines))
+
+@tex_bot.command(name='rank', help='Show rank, score, and event count for a player')
+async def rank(ctx, *, query: str):
+    key = query.strip().lower()
+    if key == 'corsairs':
+        return await ctx.send('utter trash')
+    if key == 'tsd':
+        return await ctx.send(f"`TSD` stands for: **{random_acronym('TSD')}**")
+    if key == 'ligmar':
+        return await ctx.send('BALLS!')
+    if key == 'jessica':
+        return await ctx.send('☠️ Best Corsair ☠️')
+
+    data = await fetch_json(LEADERBOARD_URL)
+    pattern = re.compile(r'^event_(\d+)_id$')
+    matches = [(i, rec) for i, rec in enumerate(data, 1)
+               if key in (f"{rec['first_name']} {rec['last_name']}".lower(), rec['first_name'].lower(), rec['last_name'].lower())]
+    if not matches:
+        return await ctx.send(f"No player found matching `{query}`.")
+    lines = []
+    for rank_pos, rec in matches:
+        total = sum(1 for k, v in rec.items() if pattern.match(k) and v)
+        cnt = min(total, 4)
+        lines.append(f"#{rank_pos} **{rec['first_name']} {rec['last_name']}** — {rec['top4_sum']} pts ({cnt} of 4)")
+    await ctx.send("\n".join(lines))
+
 
 # ========== AoS Win Rates Bot Commands ==========
 # Settings for AoS bot
@@ -750,7 +794,8 @@ async def main():
         return
     await asyncio.gather(
         leaderboard_bot.start(token_leaderboard),
-        aos_bot.start(token_aos)
+        aos_bot.start(token_aos),
+        tex_bot.start(token_texas)
     )
 
 if __name__ == '__main__':
