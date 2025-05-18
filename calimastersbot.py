@@ -503,6 +503,9 @@ async def send_standings_table(ctx, ev_name, ev_id, players, metric_names):
 # ─── !standingsfull ─────────────────────────────────────────────────────────
 @aos_bot.command(name='standingsfull')
 async def standings_full(ctx, *, query: str):
+    query = query.strip()
+    if len(query) < 4:
+        return await ctx.send(":warning: Please use at least 4 characters for your search.")
     today, week_ago = datetime.utcnow().date(), datetime.utcnow().date() - timedelta(days=7)
     params = {
         "limit": 100, "sortAscending": "true", "sortKey": "eventDate",
@@ -557,6 +560,9 @@ async def standings_full(ctx, *, query: str):
 # ─── !standings ─────────────────────────────────────────────────────────────
 @aos_bot.command(name='standings')
 async def standings_slim(ctx, *, query: str):
+    query = query.strip()
+    if len(query) < 4:
+        return await ctx.send(":warning: Please use at least 4 characters for your search.")    
     today, week_ago = datetime.utcnow().date(), datetime.utcnow().date() - timedelta(days=7)
     params = {
         "limit": 100, "sortAscending": "true", "sortKey": "eventDate",
