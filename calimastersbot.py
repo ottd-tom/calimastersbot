@@ -468,20 +468,28 @@ async def popularity_cmd(ctx, arg: str = 'factions', maybe_time: str = 'all'):
 
     await send_lines(ctx, lines)
 
+def extract_players(raw: dict):
+    # try "active" first, then "data"
+    if isinstance(raw, dict):
+        if 'active' in raw and isinstance(raw['active'], list):
+            return raw['active']
+        if 'data' in raw and isinstance(raw['data'], list):
+            return raw['data']
+    return []
+
 @aos_bot.command(name='standings')
 async def standings(ctx, *, query: str):
-    # 1) Date window: past 7 days
     today = datetime.utcnow().date()
     week_ago = today - timedelta(days=7)
 
-    # 2) Fetch events in that window
+    # 1) fetch events in past week
     params = {
         "limit":        100,
         "sortAscending":"true",
         "sortKey":      "eventDate",
         "startDate":    week_ago.isoformat(),
         "endDate":      today.isoformat(),
-        "gameType":     "4",           # Age of Sigmar
+        "gameType":     "4",
     }
     headers = {
         'Accept':       'application/json',
@@ -496,7 +504,7 @@ async def standings(ctx, *, query: str):
                 return await ctx.send(f":warning: Failed to fetch events (HTTP {resp.status})")
             events = (await resp.json()).get("data", [])
 
-        # 3) Filter by name & teamEvent=false
+        # 2) filter by name and non-team
         matches = [
             e for e in events
             if not e.get("teamEvent", False)
@@ -506,36 +514,39 @@ async def standings(ctx, *, query: str):
         if not matches:
             return await ctx.send(f":mag: No non-team AoS events in the past week matching `{query}`.")
 
-        # 4) For each match, fetch placings and post
+        # 3) for each match, fetch placings
         for e in matches:
             ev_name = e["name"]
             ev_id   = e["id"]
 
-            # fetch players with placings
-            players_url = f"{BASE_EVENT_URL}/{ev_id}/players"
-            params2 = {"placings": "true"}
-            async with session.get(players_url, params=params2, headers=headers) as presp:
+            # fetch players?placings=true
+            url = f"{BASE_EVENT_URL}/{ev_id}/players"
+            async with session.get(url, params={"placings":"true","limit":500}, headers=headers) as presp:
                 if presp.status != 200:
                     await ctx.send(f":warning: Couldn’t fetch players for `{ev_name}` ({ev_id})")
                     continue
-                players = (await presp.json()).get("data", [])
+                raw = await presp.json()
 
-            # format each player line
+            players = extract_players(raw)
+            if not players:
+                await ctx.send(f":warning: No players found for `{ev_name}` ({ev_id}).")
+                continue
+
+            # build standings lines
             lines = []
             for p in players:
                 user    = p.get("user", {})
-                fname   = user.get("firstName", "")
-                lname   = user.get("lastName", "")
-                placing = p.get("placing", "N/A")
-                metrics = p.get("metrics", [])
+                fname   = user.get("firstName","")
+                lname   = user.get("lastName","")
+                placing = p.get("placing","N/A")
+                metrics = p.get("metrics",[])
                 met_str = ", ".join(f"{m['name']}={m['value']}" for m in metrics)
                 lines.append(f"{fname} {lname} | Place: {placing} | {met_str}")
 
-            # send as a single code-block
+            # send as code block
             header = f"Standings for {ev_name} ({ev_id}):"
             content = "\n".join(lines)
             await ctx.send(f"```{header}\n{content}```")
-
 aos_bot.remove_command('help')
 @aos_bot.command(name='help', help='List all AoS bot commands')
 async def help_cmd(ctx):
