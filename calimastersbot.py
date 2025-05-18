@@ -176,6 +176,23 @@ ALIAS_MAP = {
 for full in set(ALIAS_MAP.values()):
     ALIAS_MAP[full.lower()] = full
 
+def get_shortest_alias(full_name: str) -> str:
+    """
+    Given a canonical faction name, return the shortest alias (upper-cased)
+    from ALIAS_MAP, or fall back to the full name if none found.
+    """
+    # collect all alias keys that map to this full_name, excluding the key that is the full_name itself
+    candidates = [
+        alias for alias, canon in ALIAS_MAP.items()
+        if canon == full_name and alias.lower() != full_name.lower()
+    ]
+    if not candidates:
+        return full_name
+    # pick the shortest alias key, then uppercase it
+    shortest = min(candidates, key=len)
+    return shortest.upper()
+
+
 @aos_bot.command(name='winrates', aliases=['winrate'], help='!winrates [time]|[faction_alias] [time]')
 async def winrates_cmd(ctx, arg: str = 'all', maybe_time: str = None):
     arg_lower = arg.lower()
@@ -557,33 +574,34 @@ async def standings_full(ctx, *, query: str):
             await send_standings_table(ctx, ev_name, ev_id, players, metric_names)
 
 
-# ─── !standings ─────────────────────────────────────────────────────────────
 @aos_bot.command(name='standings')
 async def standings_slim(ctx, *, query: str):
     query = query.strip()
     if len(query) < 4:
-        return await ctx.send(":warning: Please use at least 4 characters for your search.")    
+        return await ctx.send(":warning: Please use at least 4 characters for your search.")
+
     today, week_ago = datetime.utcnow().date(), datetime.utcnow().date() - timedelta(days=7)
     params = {
-        "limit": 100, "sortAscending": "true", "sortKey": "eventDate",
-        "startDate": week_ago.isoformat(), "endDate": today.isoformat(),
-        "gameType": "4"
+        "limit": 100,
+        "sortAscending": "true",
+        "sortKey": "eventDate",
+        "startDate": week_ago.isoformat(),
+        "endDate": today.isoformat(),
+        "gameType": "4",
     }
     headers = {
-        'Accept': 'application/json',
-        'x-api-key': BCP_API_KEY,
-        'client-id': CLIENT_ID,
-        'User-Agent': 'AoSBot',
+        'Accept':       'application/json',
+        'x-api-key':    BCP_API_KEY,
+        'client-id':    CLIENT_ID,
+        'User-Agent':   'AoSBot',
     }
 
     async with aiohttp.ClientSession() as session:
-        # 1) fetch full list
         async with session.get(BASE_EVENT_URL, params=params, headers=headers) as resp:
             if resp.status != 200:
                 return await ctx.send(f":warning: Failed to fetch events (HTTP {resp.status})")
             events = (await resp.json()).get("data", [])
 
-        # 2) filter by name + non-team
         matches = [
             e for e in events
             if not e.get("teamEvent", False)
@@ -592,13 +610,14 @@ async def standings_slim(ctx, *, query: str):
         if not matches:
             return await ctx.send(f":mag: No non-team AoS events this week matching `{query}`.")
 
-        # 3) for each match, fetch players but only show Wins
         for e in matches:
             ev_name, ev_id = e["name"], e["id"]
 
-            async with session.get(f"{BASE_EVENT_URL}/{ev_id}/players",
-                                   params={"placings":"true","limit":500},
-                                   headers=headers) as presp:
+            async with session.get(
+                f"{BASE_EVENT_URL}/{ev_id}/players",
+                params={"placings": "true", "limit": 500},
+                headers=headers
+            ) as presp:
                 if presp.status != 200:
                     await ctx.send(f":warning: Couldn’t fetch players for `{ev_name}` ({ev_id})")
                     continue
@@ -609,12 +628,35 @@ async def standings_slim(ctx, *, query: str):
                 await ctx.send(f":warning: No players found for `{ev_name}` ({ev_id}).")
                 continue
 
-            # check for Wins metric
-            first_metrics = [m["name"] for m in players[0].get("metrics",[])]
-            if "Wins" not in first_metrics:
+            # ensure “Wins” metric exists
+            metric_names = [m["name"] for m in players[0].get("metrics", [])]
+            if "Wins" not in metric_names:
                 return await ctx.send(f":warning: No “Wins” metric in `{ev_name}` ({ev_id}).")
 
-            await send_standings_table(ctx, ev_name, ev_id, players, ["Wins"])
+            # build table: Place | FactionAlias | Name | Wins
+            header = "Place | Faction | Name                     | Wins"
+            divider = "-" * len(header)
+            lines = [
+                f"Standings for {ev_name} ({ev_id}):",
+                header,
+                divider
+            ]
+
+            for p in players:
+                placing = p.get("placing", "")
+                user    = p.get("user", {})
+                name    = f"{user.get('firstName','')} {user.get('lastName','')}".strip()
+                full_faction = p.get("faction", {}).get("name", "")
+                faction_alias = get_shortest_alias(full_faction)
+                metric_map = {m["name"]: m["value"] for m in p.get("metrics", [])}
+                wins = metric_map.get("Wins", "")
+
+                lines.append(
+                    f"{placing:<5} | {faction_alias:<7} | {name:<24} | {wins:^4}"
+                )
+
+            await send_lines(ctx, lines)
+
 
 
 
