@@ -514,7 +514,7 @@ async def standings(ctx, *, query: str):
         if not matches:
             return await ctx.send(f":mag: No non-team AoS events in the past week matching `{query}`.")
 
-        # 3) for each match, fetch placings
+        # 3) for each match, fetch placings and accumulate lines
         for e in matches:
             ev_name = e["name"]
             ev_id   = e["id"]
@@ -532,8 +532,8 @@ async def standings(ctx, *, query: str):
                 await ctx.send(f":warning: No players found for `{ev_name}` ({ev_id}).")
                 continue
 
-            # build standings lines
-            lines = []
+            # build lines for this event
+            lines = [f"Standings for {ev_name} ({ev_id}):"]
             for p in players:
                 user    = p.get("user", {})
                 fname   = user.get("firstName","")
@@ -543,10 +543,9 @@ async def standings(ctx, *, query: str):
                 met_str = ", ".join(f"{m['name']}={m['value']}" for m in metrics)
                 lines.append(f"{fname} {lname} | Place: {placing} | {met_str}")
 
-            # send as code block
-            header = f"Standings for {ev_name} ({ev_id}):"
-            content = "\n".join(lines)
-            await ctx.send(f"```{header}\n{content}```")
+            # send in manageable chunks
+            await send_lines(ctx, lines)
+
 aos_bot.remove_command('help')
 @aos_bot.command(name='help', help='List all AoS bot commands')
 async def help_cmd(ctx):
