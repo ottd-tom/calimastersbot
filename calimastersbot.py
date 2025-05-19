@@ -498,6 +498,7 @@ async def popularity_cmd(ctx, arg: str = 'factions', maybe_time: str = 'all'):
     if arg_lower in time_filters:
         category = 'factions'
         time_filter = arg_lower
+        tf = time_filter
     elif arg_lower in valid_cats:
         category = arg_lower
         tf = maybe_time.lower()
