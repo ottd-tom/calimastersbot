@@ -545,91 +545,94 @@ import discord
 from discord.ext import commands
 from datetime import datetime, timedelta
 
-# … your existing imports, globals, ALIAS_MAP, get_shortest_alias, extract_players, send_lines, etc. …
+async def send_standings_table(ctx, ev_name, ev_id, players, metric_names):
+    header_fields = ["Place", "Name"] + metric_names
+    header_line   = " | ".join(header_fields)
+    divider       = "-" * len(header_line)
+    lines = [f"Standings for {ev_name} ({ev_id}):", header_line, divider]
+    for p in players:
+        placing = p.get("placing", "")
+        user    = p.get("user", {})
+        name    = f"{user.get('firstName','')} {user.get('lastName','')}".strip()
+        metric_map = {m['name']: m['value'] for m in p.get('metrics', [])}
+        row = [str(placing), name] + [str(metric_map.get(m, "")) for m in metric_names]
+        lines.append(" | ".join(row))
+    await send_lines(ctx, lines)
 
-# ─── helpers to process one event ─────────────────────────────────────────────
+
 async def do_standings_full(ctx, ev):
-    """Fetch players & show all metrics for one event."""
     ev_name, ev_id = ev["name"], ev["id"]
-    # fetch players…
+    headers = {'Accept':'application/json','x-api-key':BCP_API_KEY,'client-id':CLIENT_ID,'User-Agent':'AoSBot'}
     async with aiohttp.ClientSession() as session:
-        async with session.get(
-            f"{BASE_EVENT_URL}/{ev_id}/players",
-            params={"placings":"true","limit":500},
-            headers=headers
-        ) as presp:
-            presp.raise_for_status()
-            raw = await presp.json()
+        async with session.get(f"{BASE_EVENT_URL}/{ev_id}/players", params={"placings":"true","limit":500}, headers=headers) as presp:
+            presp.raise_for_status(); raw = await presp.json()
     players = extract_players(raw)
     if not players:
         return await ctx.send(f":warning: No players for `{ev_name}` ({ev_id}).")
-
-    metric_names = [m["name"] for m in players[0]["metrics"]]
+    metric_names = [m["name"] for m in players[0].get("metrics",[])]
     await send_standings_table(ctx, ev_name, ev_id, players, metric_names)
     await ctx.send(f"View full placings: https://www.bestcoastpairings.com/event/{ev_id}?active_tab=placings")
 
+
 async def do_standings_slim(ctx, ev):
-    """Fetch players & show only Wins + faction alias for one event."""
     ev_name, ev_id = ev["name"], ev["id"]
+    headers = {'Accept':'application/json','x-api-key':BCP_API_KEY,'client-id':CLIENT_ID,'User-Agent':'AoSBot'}
     async with aiohttp.ClientSession() as session:
-        async with session.get(
-            f"{BASE_EVENT_URL}/{ev_id}/players",
-            params={"placings":"true","limit":500},
-            headers=headers
-        ) as presp:
-            presp.raise_for_status()
-            raw = await presp.json()
+        async with session.get(f"{BASE_EVENT_URL}/{ev_id}/players", params={"placings":"true","limit":500}, headers=headers) as presp:
+            presp.raise_for_status(); raw = await presp.json()
     players = extract_players(raw)
     if not players:
         return await ctx.send(f":warning: No players for `{ev_name}` ({ev_id}).")
-
-    # ensure Wins exists
-    first_metrics = [m["name"] for m in players[0]["metrics"]]
+    first_metrics = [m["name"] for m in players[0].get("metrics",[])]
     if "Wins" not in first_metrics:
         return await ctx.send(f":warning: No “Wins” metric in `{ev_name}` ({ev_id}).")
-
     header = "Place | Faction | Name                     | Wins"
     divider = "-" * len(header)
     lines = [f"Standings for {ev_name} ({ev_id}):", header, divider]
-
     for p in players:
         placing = p["placing"]
         full_faction = p.get("faction",{}).get("name","")
         faction_alias = get_shortest_alias(full_faction)
         user = p["user"]
         name = f"{user['firstName']} {user['lastName']}"
-        metric_map = {m["name"]:m["value"] for m in p["metrics"]}
-        wins = metric_map.get("Wins","")
+        metric_map = {m["name"]: m["value"] for m in p["metrics"]}
+        wins = metric_map.get("Wins", "")
         lines.append(f"{placing:<5} | {faction_alias:<7} | {name:<24} | {wins:^4}")
-
     await send_lines(ctx, lines)
     await ctx.send(f"View full placings: https://www.bestcoastpairings.com/event/{ev_id}?active_tab=placings")
 
 
-# ─── dropdown UI ──────────────────────────────────────────────────────────────
+def _search_matches(events, query):
+    q = query.lower()
+    out = []
+    for e in events:
+        if e.get("teamEvent", False):
+            continue
+        name = e.get("name","...") or ""
+        loc  = e.get("formatted_address","") or e.get("city","")
+        if q in name.lower() or q in loc.lower():
+            out.append(e)
+    return out
+
+
 class StandingsSelect(discord.ui.Select):
     def __init__(self, events, slim, ctx):
-        options = [
-            discord.SelectOption(
-                label=f"{e['name']} ({e.get('formatted_address',e.get('city',''))})",
-                value=e["id"]
-            )
-            for e in events
-        ]
+        options = [discord.SelectOption(label=f"{e['name']} ({e.get('formatted_address',e.get('city',''))})",
+                                       value=e['id']) for e in events]
         super().__init__(placeholder="Select an event…", min_values=1, max_values=1, options=options)
-        self.events = {e["id"]: e for e in events}
+        self.events = {e['id']: e for e in events}
         self.slim = slim
         self.ctx = ctx
 
     async def callback(self, interaction: discord.Interaction):
         await interaction.response.defer()
-        ev_id = self.values[0]
-        ev = self.events[ev_id]
+        ev = self.events[self.values[0]]
         if self.slim:
             await do_standings_slim(self.ctx, ev)
         else:
             await do_standings_full(self.ctx, ev)
         self.view.stop()
+
 
 class StandingsView(discord.ui.View):
     def __init__(self, events, slim, ctx):
@@ -637,62 +640,71 @@ class StandingsView(discord.ui.View):
         self.add_item(StandingsSelect(events, slim, ctx))
 
 
-# ─── updated commands ────────────────────────────────────────────────────────
-def _search_matches(events, query):
-    q = query.lower()
-    out = []
-    for e in events:
-        name = e.get("name","").lower()
-        loc  = e.get("formatted_address","").lower() or e.get("city","").lower()
-        if q in name or q in loc:
-            if not e.get("teamEvent", False):
-                out.append(e)
-    return out
-
+# ========== Commands ==========
 @aos_bot.command(name='standingsfull')
 async def standings_full_cmd(ctx, *, query: str):
     query = query.strip()
     if len(query) < 4:
         return await ctx.send(":warning: Please use at least 4 characters for your search.")
-    # fetch events…
-    today, week_ago = datetime.utcnow().date(), datetime.utcnow().date() - timedelta(days=7)
-    params = { … same as before … }
+    today = datetime.utcnow().date()
+    week_ago = today - timedelta(days=7)
+    params = {
+        "limit": 100,
+        "sortAscending": "true",
+        "sortKey": "eventDate",
+        "startDate": week_ago.isoformat(),
+        "endDate": today.isoformat(),
+        "gameType": "4",
+    }
+    headers = {
+        'Accept': 'application/json',
+        'x-api-key': BCP_API_KEY,
+        'client-id': CLIENT_ID,
+        'User-Agent': 'AoSBot',
+    }
     async with aiohttp.ClientSession() as session:
         async with session.get(BASE_EVENT_URL, params=params, headers=headers) as resp:
             resp.raise_for_status()
-            events = (await resp.json())["data"]
-
+            events = (await resp.json()).get('data', [])
     matches = _search_matches(events, query)
     if not matches:
         return await ctx.send(f":mag: No AoS events this week matching `{query}`.")
     if len(matches) == 1:
         return await do_standings_full(ctx, matches[0])
-
-    # many matches → dropdown
     await ctx.send("Multiple events found—please pick one:", view=StandingsView(matches, slim=False, ctx=ctx))
+
 
 @aos_bot.command(name='standings')
 async def standings_slim_cmd(ctx, *, query: str):
     query = query.strip()
     if len(query) < 4:
         return await ctx.send(":warning: Please use at least 4 characters for your search.")
-    # fetch events…
-    today, week_ago = datetime.utcnow().date(), datetime.utcnow().date() - timedelta(days=7)
-    params = { … same as before … }
+    today = datetime.utcnow().date()
+    week_ago = today - timedelta(days=7)
+    params = {
+        "limit": 100,
+        "sortAscending": "true",
+        "sortKey": "eventDate",
+        "startDate": week_ago.isoformat(),
+        "endDate": today.isoformat(),
+        "gameType": "4",
+    }
+    headers = {
+        'Accept': 'application/json',
+        'x-api-key': BCP_API_KEY,
+        'client-id': CLIENT_ID,
+        'User-Agent': 'AoSBot',
+    }
     async with aiohttp.ClientSession() as session:
         async with session.get(BASE_EVENT_URL, params=params, headers=headers) as resp:
             resp.raise_for_status()
-            events = (await resp.json())["data"]
-
+            events = (await resp.json()).get('data', [])
     matches = _search_matches(events, query)
     if not matches:
         return await ctx.send(f":mag: No AoS events this week matching `{query}`.")
     if len(matches) == 1:
         return await do_standings_slim(ctx, matches[0])
-
-    # many matches → dropdown
     await ctx.send("Multiple events found—please pick one:", view=StandingsView(matches, slim=True, ctx=ctx))
-
 
 
 
