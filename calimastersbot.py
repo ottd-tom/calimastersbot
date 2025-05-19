@@ -17,8 +17,8 @@ logging.basicConfig(level=logging.INFO)
 token_leaderboard = os.getenv('DISCORD_TOKEN')
 token_aos = os.getenv('DISCORD_TOKEN_AOSEVENTS')
 token_texas = os.getenv('TEXAS_DISCORD_BOT')
-api_url = "https://aos-events.com"
-LEADERBOARD_URL = 'https://aos-events.com/api/california_itc_scores'
+API_URL = "https://aos-events.com"
+CALI_URL = 'https://aos-events.com/api/california_itc_scores'
 TEXAS_URL = 'https://aos-events.com/api/texas_itc_scores'
 BCP_API_KEY   = os.getenv("BCP_API_KEY")        
 CLIENT_ID     = os.getenv("BCP_CLIENT_ID")   
@@ -86,20 +86,20 @@ async def fetch_json(url):
             return await resp.json()
 
 async def fetch_winrates(time_filter='all'):
-    base = api_url.rstrip('/')
+    base = API_URL.rstrip('/')
     url = f"{base if base.lower().endswith('winrates') else base + '/api/winrates'}?time={time_filter}"
     return await fetch_json(url)
 
 
 async def fetch_enhancement(time_filter='all', rounds_filter='all'):
-    base = api_url.rstrip('/')
+    base = API_URL.rstrip('/')
     url = f"{base}/api/enhancement_winrates?time={time_filter}&rounds={rounds_filter}"
     return await fetch_json(url)
 
 # ========== Leaderboard Bot Commands ==========
 @leaderboard_bot.command(name='top8', help='Show the current Cali Masters top 8')
 async def top8(ctx):
-    data = await fetch_json(LEADERBOARD_URL)
+    data = await fetch_json(CALI_URL)
     top = data[:8]
     if not top:
         return await ctx.send("No data available.")
@@ -123,7 +123,7 @@ async def rank(ctx, *, query: str):
     if key == 'jessica':
         return await ctx.send('☠️ Best Corsair ☠️')
 
-    data = await fetch_json(LEADERBOARD_URL)
+    data = await fetch_json(CALI_URL)
     pattern = re.compile(r'^event_(\d+)_id$')
     matches = [(i, rec) for i, rec in enumerate(data, 1)
                if key in (f"{rec['first_name']} {rec['last_name']}".lower(), rec['first_name'].lower(), rec['last_name'].lower())]
@@ -313,7 +313,7 @@ async def formations_cmd(ctx, faction_alias: str, time_filter: str = 'all'):
 
 async def fetch_itc_placings(name: str):
     """Call your Flask API to get ITC placings for a given name."""
-    base = api_url.rstrip('/')
+    base = API_URL.rstrip('/')
     q = urllib.parse.quote(name)
     url = f"{base}/api/itc_placings?name={q}"
     return await fetch_json(url)
@@ -415,7 +415,7 @@ async def hof(ctx, *, alias: str):
         return await ctx.send(f"Unknown faction '{alias}'. Available aliases: {', '.join(ALIAS_MAP.keys())}")
 
     # Fetch Hall of Fame entries
-    url = f"{api_url.rstrip('/')}/api/five_win_players"
+    url = f"{API_URL.rstrip('/')}/api/five_win_players"
     data = await fetch_json(url)
     entries = [e for e in data if e.get('faction') == canonical]
 
@@ -454,7 +454,7 @@ async def units_cmd(ctx, alias: str, time_filter: str = 'all'):
         )
 
     # Fetch the winrates payload
-    url = f"{api_url.rstrip('/')}/api/winrates?time={tf}"
+    url = f"{API_URL.rstrip('/')}/api/winrates?time={tf}"
     data = await fetch_json(url)
 
     # Filter units by faction
@@ -510,7 +510,7 @@ async def popularity_cmd(ctx, arg: str = 'factions', maybe_time: str = 'all'):
             f"Time filters: {', '.join(time_filters)}"
         )
 
-    url = f"{api_url.rstrip('/')}/api/popularity?time={time_filter}"
+    url = f"{API_URL.rstrip('/')}/api/popularity?time={time_filter}"
     data = await fetch_json(url)
     items = data.get(category, [])
     if not items:
