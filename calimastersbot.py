@@ -617,21 +617,24 @@ def _search_matches(events, query):
 
 class StandingsSelect(discord.ui.Select):
     def __init__(self, events, slim, ctx):
-        options = [discord.SelectOption(label=f"{e['name']} ({e.get('formatted_address',e.get('city',''))})",
-                                       value=e['id']) for e in events]
-        super().__init__(placeholder="Select an event…", min_values=1, max_values=1, options=options)
+        options = []
+        for e in events:
+            loc = e.get('formatted_address', e.get('city', ''))
+            label = f"{e['name']} ({loc})"
+            # truncate to 100 chars max
+            if len(label) > 100:
+                label = label[:97] + "..."
+            options.append(discord.SelectOption(label=label, value=e['id']))
+
+        super().__init__(
+            placeholder="Select an event…",
+            min_values=1,
+            max_values=1,
+            options=options
+        )
         self.events = {e['id']: e for e in events}
         self.slim = slim
         self.ctx = ctx
-
-    async def callback(self, interaction: discord.Interaction):
-        await interaction.response.defer()
-        ev = self.events[self.values[0]]
-        if self.slim:
-            await do_standings_slim(self.ctx, ev)
-        else:
-            await do_standings_full(self.ctx, ev)
-        self.view.stop()
 
 
 class StandingsView(discord.ui.View):
