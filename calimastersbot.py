@@ -197,7 +197,7 @@ ALIAS_MAP = {
     'idk': 'Idoneth Deepkin', 'idoneth': 'Idoneth Deepkin', 'deepkin': 'Idoneth Deepkin', 'fish': 'Idoneth Deepkin',
     'lrl': 'Lumineth Realm-lords', 'lumineth': 'Lumineth Realm-lords', 'realm-lords': 'Lumineth Realm-lords', 'Lumineth Realm-Lords' : 'Lumineth Realm-lords',
     'dot': 'Disciples of Tzeentch', 'tzeentch': 'Disciples of Tzeentch',
-    'sons': 'Sons of Behemat', 'sob': 'Sons of Behemat',
+    'sons': 'Sons of Behemat', 'sob': 'Sons of Behemat', 'giants': 'Sons of Behemat',
     'trees': 'Sylvaneth', 'sylvaneth': 'Sylvaneth',
     'Sera': 'Seraphon', 'lizards': 'Seraphon', 'seraphon': 'Seraphon',
     'sbgl': 'Soulblight Gravelords', 'soulblight' : 'Soulblight Gravelords', 'vampires': 'Soulblight Gravelords',
