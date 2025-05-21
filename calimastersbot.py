@@ -709,6 +709,121 @@ async def standings_slim_cmd(ctx, *, query: str):
     await ctx.send("Multiple events found—please pick one:", view=StandingsView(matches, slim=True, ctx=ctx))
 
 
+# ─── Pairings Command ─────────────────────────────────────────────────────────
+
+# helper to fetch and display pairings
+async def do_pairings(ctx, ev):
+    ev_name, ev_id = ev["name"], ev["id"]
+    headers = {
+        'Accept':      'application/json',
+        'x-api-key':   BCP_API_KEY,
+        'client-id':   CLIENT_ID,
+        'User-Agent':  'AoSBot',
+    }
+    pairings = None
+    found_round = None
+
+    # try rounds 8 down to 1
+    async with aiohttp.ClientSession() as session:
+        for rnd in range(8, 0, -1):
+            params = {
+                "eventId":     ev_id,
+                "round":       rnd,
+                "pairingType": "Pairing"
+            }
+            async with session.get(f"{BASE_EVENT_URL}/{ev_id}/pairings",
+                                   params=params,
+                                   headers=headers) as presp:
+                presp.raise_for_status()
+                raw = await presp.json()
+            # assume API returns either {'data': [...]} or a bare list
+            cand = raw.get('data', raw)  
+            if cand:
+                pairings = cand
+                found_round = rnd
+                break
+
+    if not pairings:
+        return await ctx.send(f":warning: No pairings found for `{ev_name}` ({ev_id}).")
+
+    # build and send table
+    header = f"Pairings for {ev_name} ({ev_id}) — Round {found_round}"
+    cols   = "Player 1               | Pts | Res | Player 2               | Pts | Res"
+    divider= "-" * len(cols)
+    lines = [header, cols, divider]
+    for p in pairings:
+        # adjust field names if your API returns different keys
+        p1 = p.get('player1Name') or f"ID {p.get('player1Id')}"
+        p2 = p.get('player2Name') or f"ID {p.get('player2Id')}"
+        lines.append(f"{p1:<23} | {p.get('player1Points', ''):^3} | {p.get('player1Result', ''):^3} | "
+                     f"{p2:<23} | {p.get('player2Points', ''):^3} | {p.get('player2Result', ''):^3}")
+
+    await send_lines(ctx, lines)
+    await ctx.send(f"View full pairings: https://www.bestcoastpairings.com/event/{ev_id}?active_tab=pairings")
+
+
+# UI to pick from multiple events
+class PairingsSelect(discord.ui.Select):
+    def __init__(self, events, ctx):
+        options = []
+        for e in events:
+            loc   = e.get("formatted_address", e.get("city", ""))
+            label = f"{e['name']} ({loc})"
+            if len(label) > 100:
+                label = label[:97] + "..."
+            options.append(discord.SelectOption(label=label, value=e["id"]))
+        super().__init__(placeholder="Select an event…", min_values=1, max_values=1, options=options)
+        self.events = {e["id"]: e for e in events}
+        self.ctx    = ctx
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer(thinking=True)
+        ev = self.events[self.values[0]]
+        await do_pairings(self.ctx, ev)
+        self.view.stop()
+
+
+class PairingsView(discord.ui.View):
+    def __init__(self, events, ctx):
+        super().__init__(timeout=60)
+        self.add_item(PairingsSelect(events, ctx))
+
+
+# the actual command
+@aos_bot.command(name='pairings', help='Show pairings for an AoS event (looks back from round 8)')
+async def pairings_cmd(ctx, *, query: str):
+    if len(query.strip()) < 4:
+        return await ctx.send(":warning: Please use at least 4 characters for your search.")
+    # same window as !standings
+    today    = datetime.utcnow().date()
+    week_ago = today - timedelta(days=7)
+    params = {
+        "limit":        100,
+        "sortAscending":"true",
+        "sortKey":      "eventDate",
+        "startDate":    week_ago.isoformat(),
+        "endDate":      today.isoformat(),
+        "gameType":     "4",
+    }
+    headers = {
+        'Accept':     'application/json',
+        'x-api-key':  BCP_API_KEY,
+        'client-id':  CLIENT_ID,
+        'User-Agent': 'AoSBot',
+    }
+    # fetch recent events
+    async with aiohttp.ClientSession() as session:
+        async with session.get(BASE_EVENT_URL, params=params, headers=headers) as resp:
+            resp.raise_for_status()
+            events = (await resp.json()).get('data', [])
+    matches = _search_matches(events, query)
+    if not matches:
+        return await ctx.send(f":mag: No AoS events this week matching `{query}`.")
+    if len(matches) == 1:
+        return await do_pairings(ctx, matches[0])
+    await ctx.send("Multiple events found—please pick one:", view=PairingsView(matches, ctx))
+
+
 # ─── ITC STANDINGS ────────────────────────────────────────────────────────────
 ITC_LEAGUE_ID = "vldWOTsjXggj"
 ITC_REGION_ID = "61vXu5vli4"
