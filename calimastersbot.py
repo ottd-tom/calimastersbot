@@ -1074,6 +1074,8 @@ async def help_cmd(ctx):
     lines.append("!itcstandings <faction_alias> - ITC current top 10")
     lines.append("!standings <event_search> - Current standings at event")
     lines.append("!standingsfull <event_search> - Full standings info")
+    lines.append("!pairings <event_search> - Latest pairings at event")
+    lines.append("!pairings number <event_search> - Pairings for round")
     lines.append("")
     lines.append("Time filters: all (Since 2025/01/01), recent (Last 60 days), battlescroll (Since last battlescroll)")
     lines.append("")
