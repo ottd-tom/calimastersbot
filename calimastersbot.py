@@ -710,69 +710,78 @@ async def standings_slim_cmd(ctx, *, query: str):
 
 
 # ─── Pairings Command ─────────────────────────────────────────────────────────
+# ─── Pairings Command ─────────────────────────────────────────────────────────
 
-# helper to fetch and display pairings
 async def do_pairings(ctx, ev):
     ev_name, ev_id = ev["name"], ev["id"]
     headers = {
-        'Accept':      'application/json',
-        'x-api-key':   BCP_API_KEY,
-        'client-id':   CLIENT_ID,
-        'User-Agent':  'AoSBot',
+        "Accept":      "application/json",
+        "x-api-key":   BCP_API_KEY,
+        "client-id":   CLIENT_ID,
+        "User-Agent":  "AoSBot/1.0",
     }
-    pairings = None
-    found_round = None
+    max_round = 8
+    pairings = []
+    chosen_round = None
 
-    # try rounds 8 down to 1
     async with aiohttp.ClientSession() as session:
-        for rnd in range(8, 0, -1):
+        for rnd in range(max_round, 0, -1):
             params = {
                 "eventId":     ev_id,
                 "round":       rnd,
-                "pairingType": "Pairing"
+                "pairingType": "Pairing",
             }
             async with session.get(f"{BASE_EVENT_URL}/{ev_id}/pairings",
                                    params=params,
                                    headers=headers) as presp:
                 presp.raise_for_status()
-                raw = await presp.json()
-            # assume API returns either {'data': [...]} or a bare list
-            cand = raw.get('data', raw)  
-            if cand:
-                pairings = cand
-                found_round = rnd
+                data = await presp.json()
+            active = data.get("active", [])
+            if active:
+                pairings = active
+                chosen_round = rnd
                 break
 
     if not pairings:
         return await ctx.send(f":warning: No pairings found for `{ev_name}` ({ev_id}).")
 
-    # build and send table
-    header = f"Pairings for {ev_name} ({ev_id}) — Round {found_round}"
-    cols   = "Player 1               | Pts | Res | Player 2               | Pts | Res"
+    # build table header
+    header = f"Pairings for {ev_name} ({ev_id}) — Round {chosen_round}"
+    cols   = "Player 1 Name         | Pts | Player 2 Name         | Pts"
     divider= "-" * len(cols)
+
     lines = [header, cols, divider]
     for p in pairings:
-        # adjust field names if your API returns different keys
-        p1 = p.get('player1Name') or f"ID {p.get('player1Id')}"
-        p2 = p.get('player2Name') or f"ID {p.get('player2Id')}"
-        lines.append(f"{p1:<23} | {p.get('player1Points', ''):^3} | {p.get('player1Result', ''):^3} | "
-                     f"{p2:<23} | {p.get('player2Points', ''):^3} | {p.get('player2Result', ''):^3}")
+        # Player 1
+        u1 = p["player1"]["user"]
+        name1 = f"{u1['firstName']} {u1['lastName']}"
+        pts1  = p.get("player1Game", {}).get("points", "")
+
+        # Player 2 (may be missing for a bye)
+        if p.get("player2"):
+            u2   = p["player2"]["user"]
+            name2= f"{u2['firstName']} {u2['lastName']}"
+            pts2 = p.get("player2Game", {}).get("points", "")
+        else:
+            name2, pts2 = "(bye)", ""
+
+        lines.append(f"{name1:<22} | {pts1:^3} | {name2:<22} | {pts2:^3}")
 
     await send_lines(ctx, lines)
     await ctx.send(f"View full pairings: https://www.bestcoastpairings.com/event/{ev_id}?active_tab=pairings")
 
 
-# UI to pick from multiple events
 class PairingsSelect(discord.ui.Select):
     def __init__(self, events, ctx):
         options = []
         for e in events:
-            loc   = e.get("formatted_address", e.get("city", ""))
+            loc = e.get("formatted_address", e.get("city", ""))
             label = f"{e['name']} ({loc})"
             if len(label) > 100:
                 label = label[:97] + "..."
             options.append(discord.SelectOption(label=label, value=e["id"]))
-        super().__init__(placeholder="Select an event…", min_values=1, max_values=1, options=options)
+        super().__init__(placeholder="Select an event…",
+                         min_values=1, max_values=1, options=options)
         self.events = {e["id"]: e for e in events}
         self.ctx    = ctx
 
@@ -789,12 +798,11 @@ class PairingsView(discord.ui.View):
         self.add_item(PairingsSelect(events, ctx))
 
 
-# the actual command
-@aos_bot.command(name='pairings', help='Show pairings for an AoS event (looks back from round 8)')
+@aos_bot.command(name='pairings', help='Show pairings for an AoS event (finds the last round with data)')
 async def pairings_cmd(ctx, *, query: str):
     if len(query.strip()) < 4:
         return await ctx.send(":warning: Please use at least 4 characters for your search.")
-    # same window as !standings
+
     today    = datetime.utcnow().date()
     week_ago = today - timedelta(days=7)
     params = {
@@ -806,23 +814,24 @@ async def pairings_cmd(ctx, *, query: str):
         "gameType":     "4",
     }
     headers = {
-        'Accept':     'application/json',
-        'x-api-key':  BCP_API_KEY,
-        'client-id':  CLIENT_ID,
-        'User-Agent': 'AoSBot',
+        "Accept":     "application/json",
+        "x-api-key":  BCP_API_KEY,
+        "client-id":  CLIENT_ID,
+        "User-Agent": "AoSBot/1.0",
     }
-    # fetch recent events
+
     async with aiohttp.ClientSession() as session:
         async with session.get(BASE_EVENT_URL, params=params, headers=headers) as resp:
             resp.raise_for_status()
-            events = (await resp.json()).get('data', [])
+            events = (await resp.json()).get("data", [])
+
     matches = _search_matches(events, query)
     if not matches:
         return await ctx.send(f":mag: No AoS events this week matching `{query}`.")
     if len(matches) == 1:
         return await do_pairings(ctx, matches[0])
-    await ctx.send("Multiple events found—please pick one:", view=PairingsView(matches, ctx))
 
+    await ctx.send("Multiple events found—please pick one:", view=PairingsView(matches, ctx))
 
 # ─── ITC STANDINGS ────────────────────────────────────────────────────────────
 ITC_LEAGUE_ID = "vldWOTsjXggj"
