@@ -386,6 +386,21 @@ def extract_players(raw: dict):
             return raw['data']
     return []
 
+def _search_matches(events, query):
+    """
+    Return all events whose name, address, or city contains the query.
+    """
+    q = query.lower()
+    out = []
+    for e in events:
+        name = (e.get("name") or "").lower()
+        addr = (e.get("formatted_address") or "").lower()
+        city = (e.get("city") or "").lower()
+        if q in name or q in addr or q in city:
+            out.append(e)
+    return out
+
+
 async def send_standings_table(ctx, ev_name, ev_id, players, metric_names):
     header_fields = ["Place", "Name"] + metric_names
     header_line   = " | ".join(header_fields)
