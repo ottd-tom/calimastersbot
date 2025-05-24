@@ -511,19 +511,19 @@ async def do_standings_slim(ctx, ev):
     await send_lines(ctx, lines)
     await ctx.send(f"View full placings: https://www.bestcoastpairings.com/event/{ev_id}?active_tab=placings")
 
-
 def _search_matches(events, query):
     q = query.lower()
     out = []
-    for e in events:
-        if e.get("teamEvent", False):
-            continue
-        name = e.get("name","...") or ""
-        loc  = e.get("formatted_address","") or e.get("city","")
-        if q in name.lower() or q in loc.lower():
-            out.append(e)
-    return out
 
+    for e in events:
+        name = (e.get("name") or "").lower()
+        addr = (e.get("formatted_address") or "").lower()
+        city = (e.get("city") or "").lower()
+        # now we search _all_ three fields:
+        if q in name or q in addr or q in city:
+            out.append(e)
+
+    return out
 
 class StandingsSelect(discord.ui.Select):
     def __init__(self, events, slim, ctx):
