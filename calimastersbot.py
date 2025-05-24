@@ -644,6 +644,7 @@ async def pairings_cmd(ctx, *, args: str):
 
     await ctx.send("Multiple events found—please pick one:", view=PairingsView(matches, ctx))
 
+aos_bot.remove_command('help')
 @aos_bot.command(name='help', help='List all AoS bot commands')
 async def help_cmd(ctx):
     lines = ["**AoS Events Bot Commands**",
