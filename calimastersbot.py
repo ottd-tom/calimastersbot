@@ -752,12 +752,8 @@ async def do_pairings(ctx, ev, requested_round=None):
     chosen_round = requested_round
 
     async with aiohttp.ClientSession() as session:
-        if requested_round:
-            # only try that one round
-            rounds = [requested_round]
-        else:
-            # highest→lowest
-            rounds = list(range(8, 0, -1))
+        # if the user requested a specific round, only try that one; otherwise back‐off from 8→1
+        rounds = [requested_round] if requested_round else list(range(8, 0, -1))
 
         for rnd in rounds:
             params = {
@@ -766,28 +762,40 @@ async def do_pairings(ctx, ev, requested_round=None):
                 "pairingType": "Pairing",
             }
             async with session.get(f"{BASE_EVENT_URL}/{ev_id}/pairings",
-                                   params=params, headers=headers) as presp:
+                                   params=params,
+                                   headers=headers) as presp:
                 presp.raise_for_status()
-                data = await presp.json()
+                raw = await presp.json()
 
-            active = data.get("active", [])
+            # some events return pairings under "active", others under "data"
+            active = raw.get("active")
+            if not active:
+                active = raw.get("data", [])
+
             if active:
                 pairings = active
                 chosen_round = rnd
                 break
 
     if not pairings:
-        return await ctx.send(f":warning: No pairings found for `{ev_name}` ({ev_id})"
-                              + (f" in round {requested_round}." if requested_round else "."))
+        # no pairings at all (or in the requested round)
+        if requested_round:
+            return await ctx.send(
+                f":warning: No pairings found for `{ev_name}` ({ev_id}) in round {requested_round}."
+            )
+        else:
+            return await ctx.send(
+                f":warning: No pairings found for `{ev_name}` ({ev_id})."
+            )
 
-    # build a simple two-column table
-    header = f"Pairings for {ev_name} ({ev_id}) — Round {chosen_round}"
-    cols   = "Player 1 Name         | Pts | Player 2 Name         | Pts"
-    divider= "-" * len(cols)
+    # build a simple two‐column table
+    header  = f"Pairings for {ev_name} ({ev_id}) — Round {chosen_round}"
+    cols    = "Player 1 Name         | Pts | Player 2 Name         | Pts"
+    divider = "-" * len(cols)
 
     lines = [header, cols, divider]
     for p in pairings:
-        u1 = p["player1"]["user"]
+        u1    = p["player1"]["user"]
         name1 = f"{u1['firstName']} {u1['lastName']}"
         pts1  = p.get("player1Game", {}).get("points", "")
 
