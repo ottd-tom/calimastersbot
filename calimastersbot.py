@@ -1100,7 +1100,7 @@ async def debug_events(ctx):
 @aos_bot.command(name='debug_search', help='(dev) Show which events match a search term, with reason')
 async def debug_search(ctx, *, term: str):
     term_l = term.lower()
-    today    = datetime.utcnow().date()
+    today    = datetime.utcnow().date()+timedelta(days=3)
     week_ago = today - timedelta(days=7)
     params = {
         "limit":        100,
