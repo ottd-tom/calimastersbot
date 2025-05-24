@@ -1055,6 +1055,47 @@ async def itcstandings_cmd(ctx, faction: str = None):
     # 5) send in a single code block (it’s short)
     await ctx.send("```" + "\n".join(lines) + "```")
 
+@aos_bot.command(name='debug_events', help='(dev) List all event names + teamEvent flags')
+async def debug_events(ctx):
+    today    = datetime.utcnow().date() + timedelta(days=3)
+    week_ago = today - timedelta(days=7)
+    params = {
+        "limit":        100,
+        "sortAscending":"true",
+        "sortKey":      "eventDate",
+        "startDate":    week_ago.isoformat(),
+        "endDate":      today.isoformat(),
+        "gameType":     "4",
+    }
+    headers = {
+        "Accept":     "application/json",
+        "x-api-key":  BCP_API_KEY,
+        "client-id":  CLIENT_ID,
+        "User-Agent": "AoSBot/1.0",
+    }
+
+    async with aiohttp.ClientSession() as session:
+        async with session.get(BASE_EVENT_URL, params=params, headers=headers) as resp:
+            resp.raise_for_status()
+            events = (await resp.json()).get("data", [])
+
+    lines = []
+    for e in events:
+        name = e.get("name", "<no name>")
+        team = e.get("teamEvent", False)
+        lines.append(f"{'[T]' if team else '[ ]'} {name}")
+
+    # chunk if needed
+    buf, count = [], 0
+    for line in lines:
+        ln = len(line)+1
+        if count+ln > 1900:
+            await ctx.send("```"+ "\n".join(buf) + "```")
+            buf, count = [line], ln
+        else:
+            buf.append(line); count += ln
+    if buf:
+        await ctx.send("```"+ "\n".join(buf) + "```")
 
 
 aos_bot.remove_command('help')
