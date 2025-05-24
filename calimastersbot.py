@@ -477,7 +477,7 @@ async def standings_slim_cmd(ctx, *, query: str):
         async with session.get(BASE_EVENT_URL, params=params, headers=headers) as resp:
             resp.raise_for_status()
             events = (await resp.json()).get('data', [])
-    await ctx.send("```Events seen by !standings:\n" + "\n".join(e.get("name","<no name>") for e in events) + "\n```")        
+       
     matches = _search_matches(events, query)
     if not matches:
         return await ctx.send(f":mag: No AoS events this week matching `{query}`.")
