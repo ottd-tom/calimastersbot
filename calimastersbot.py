@@ -138,15 +138,6 @@ async def rank(ctx, *, query: str):
         lines.append(f"#{rank_pos} **{rec['first_name']} {rec['last_name']}** — {rec['top4_sum']} pts ({cnt} of 4)")
     await ctx.send("\n".join(lines))
 
-@leaderboard_bot.command(name='ramon')
-async def ramon(ctx):
-    lines = [
-        "It's ironic to me, I've always been able to relate to military people.",
-        "Even though I'm a Rasta at heart, I've regularly had people ask me if I have been in the military,",
-        "after seeing me work/perform so systematically.",
-        "And although I've never served, I completely have more than enough PTSD to pass for the average veteran."
-    ]
-    await send_lines(ctx, lines)
 
 # ========== Texas Bot Commands ==========
 
