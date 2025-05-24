@@ -453,32 +453,46 @@ async def do_standings_slim(ctx, ev):
     await ctx.send(f"View full placings: https://www.bestcoastpairings.com/event/{ev_id}?active_tab=placings")
 
 @aos_bot.command(name='standings', help='Current standings at event')
-async def standings_slim_cmd(ctx, *, query: str):
-    query = query.strip()
-    if len(query) < 4:
-        return await ctx.send(":warning: Use at least 4 characters for your search.")
-    today = datetime.utcnow().date() + timedelta(days=3)
-    week_ago = today - timedelta(days=10)
+async def standings_slim_cmd(ctx, *, args: str):
+    parts = args.split(maxsplit=1)
+    requested_round = None
+    query = args
+
+    if len(parts) == 2 and parts[0].isdigit():
+        rnd = int(parts[0])
+        if 1 <= rnd <= 8:
+            requested_round = rnd
+            query = parts[1]
+        else:
+            return await ctx.send(":warning: Round must be 1–8.")
+
+    if len(query.strip()) < 4:
+        return await ctx.send(":warning: Please use at least 4 characters for your search.")
+
+    today    = datetime.utcnow().date() + timedelta(days=3)
+    week_ago = today - timedelta(days=7)
     params = {
-        "limit": 100,
-        "sortAscending": "true",
-        "sortKey": "eventDate",
-        "startDate": week_ago.isoformat(),
-        "endDate": today.isoformat(),
-        "gameType": "4",
+        "limit":        100,
+        "sortAscending":"true",
+        "sortKey":      "eventDate",
+        "startDate":    week_ago.isoformat(),
+        "endDate":      today.isoformat(),
+        "gameType":     "4",
     }
     headers = {
-        'Accept': 'application/json',
-        'x-api-key': BCP_API_KEY,
-        'client-id': CLIENT_ID,
-        'User-Agent': 'AoSBot',
+        "Accept":     "application/json",
+        "x-api-key":  BCP_API_KEY,
+        "client-id":  CLIENT_ID,
+        "User-Agent": "AoSBot/1.0",
     }
+
     async with aiohttp.ClientSession() as session:
         async with session.get(BASE_EVENT_URL, params=params, headers=headers) as resp:
             resp.raise_for_status()
-            events = (await resp.json()).get('data', [])
-       
+            events = (await resp.json()).get("data", [])
+
     matches = _search_matches(events, query)
+
     if not matches:
         return await ctx.send(f":mag: No AoS events this week matching `{query}`.")
     if len(matches) == 1:
