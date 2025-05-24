@@ -614,7 +614,7 @@ async def pairings_cmd(ctx, *, args: str):
     if len(query.strip()) < 4:
         return await ctx.send(":warning: Please use at least 4 characters for your search.")
 
-    today    = datetime.utcnow().date()
+    today    = datetime.utcnow().date() + timedelta(days=3)
     week_ago = today - timedelta(days=7)
     params = {
         "limit":        100,
