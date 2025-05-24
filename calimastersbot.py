@@ -1097,6 +1097,57 @@ async def debug_events(ctx):
     if buf:
         await ctx.send("```"+ "\n".join(buf) + "```")
 
+@aos_bot.command(name='debug_search', help='(dev) Show which events match a search term, with reason')
+async def debug_search(ctx, *, term: str):
+    term_l = term.lower()
+    today    = datetime.utcnow().date()
+    week_ago = today - timedelta(days=7)
+    params = {
+        "limit":        100,
+        "sortAscending":"true",
+        "sortKey":      "eventDate",
+        "startDate":    week_ago.isoformat(),
+        "endDate":      today.isoformat(),
+        "gameType":     "4",
+    }
+    headers = {
+        "Accept":     "application/json",
+        "x-api-key":  BCP_API_KEY,
+        "client-id":  CLIENT_ID,
+        "User-Agent": "AoSBot/1.0",
+    }
+
+    async with aiohttp.ClientSession() as session:
+        async with session.get(BASE_EVENT_URL, params=params, headers=headers) as resp:
+            resp.raise_for_status()
+            events = (await resp.json()).get("data", [])
+
+    lines = [f"Searching last week’s events for '{term}'…"]
+    for e in events:
+        name  = e.get("name","")
+        addr  = e.get("formatted_address") or ""
+        city  = e.get("city") or ""
+        name_l = name.lower()
+        addr_l = addr.lower()
+        city_l = city.lower()
+
+        name_ok = term_l in name_l
+        addr_ok = term_l in addr_l
+        city_ok = term_l in city_l
+
+        if name_ok or addr_ok or city_ok:
+            lines.append(
+                f"- ✅ {name!r}\n"
+                f"    teamEvent={e.get('teamEvent')},\n"
+                f"    name contains? {name_ok}, addr? {addr_ok}, city? {city_ok}"
+            )
+
+    if len(lines) == 1:
+        lines.append("No matches found.")
+    # send as a code block
+    await ctx.send("```" + "\n".join(lines) + "```")
+
+
 
 aos_bot.remove_command('help')
 @aos_bot.command(name='help', help='List all AoS bot commands')
