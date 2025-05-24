@@ -457,8 +457,8 @@ async def standings_slim_cmd(ctx, *, query: str):
     query = query.strip()
     if len(query) < 4:
         return await ctx.send(":warning: Use at least 4 characters for your search.")
-    today = datetime.utcnow().date()
-    week_ago = today - timedelta(days=7)
+    today = datetime.utcnow().date() + timedelta(days=3)
+    week_ago = today - timedelta(days=10)
     params = {
         "limit": 100,
         "sortAscending": "true",
@@ -489,8 +489,8 @@ async def standings_full_cmd(ctx, *, query: str):
     query = query.strip()
     if len(query) < 4:
         return await ctx.send(":warning: Use at least 4 characters.")
-    today = datetime.utcnow().date()
-    week_ago = today - timedelta(days=7)
+    today = datetime.utcnow().date() + timedelta(days=3)
+    week_ago = today - timedelta(days=10)
     params = {
         "limit": 100,
         "sortAscending": "true",
