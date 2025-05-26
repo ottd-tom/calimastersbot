@@ -24,6 +24,7 @@ BCP_API_KEY       = os.getenv("BCP_API_KEY")
 CLIENT_ID         = os.getenv("BCP_CLIENT_ID")
 BASE_EVENT_URL    = 'https://newprod-api.bestcoastpairings.com/v1/events'
 ITC_LEAGUE_ID     = 'vldWOTsjXggj'
+ITC_REGION_ID     = '61vXu5vli4'
 
 # Shared settings
 intents = discord.Intents.default()
