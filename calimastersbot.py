@@ -23,6 +23,7 @@ TEXAS_URL         = 'https://aos-events.com/api/texas_itc_scores'
 BCP_API_KEY       = os.getenv("BCP_API_KEY")
 CLIENT_ID         = os.getenv("BCP_CLIENT_ID")
 BASE_EVENT_URL    = 'https://newprod-api.bestcoastpairings.com/v1/events'
+ITC_LEAGUE_ID     = 'vldWOTsjXggj'
 
 # Shared settings
 intents = discord.Intents.default()
