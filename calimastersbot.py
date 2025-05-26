@@ -681,6 +681,82 @@ async def pairings_cmd(ctx, *, args: str):
 
     await ctx.send("Multiple events found—please pick one:", view=PairingsView(matches, ctx))
 
+@aos_bot.command(name='itcstandings', help='Show top 10 ITC standings, optionally for a faction: !itcstandings [faction_alias]')
+async def itcstandings_cmd(ctx, faction: str = None):
+    headers = {
+        'Accept':       'application/json',
+        'x-api-key':    BCP_API_KEY,
+        'client-id':    CLIENT_ID,
+        'User-Agent':   'AoS-ITCStandings-Bot',
+    }
+
+    async with aiohttp.ClientSession() as session:
+        # decide which params to use
+        if faction:
+            # 1) resolve alias -> canonical
+            canon = ALIAS_MAP.get(faction.lower())
+            if not canon:
+                return await ctx.send(f":warning: Unknown faction alias `{faction}`.")
+            # 2) fetch armies to find the matching ID
+            resp = await session.get(
+                "https://newprod-api.bestcoastpairings.com/v1/armies",
+                params={"gameType": 4},
+                headers=headers
+            )
+            resp.raise_for_status()
+            armies = (await resp.json()).get("data", [])
+            army = next((
+                a for a in armies
+                if a["name"].lower() == canon.lower()
+                or a.get("gwFactionName","").lower() == canon.lower()
+            ), None)
+            if not army:
+                return await ctx.send(f":warning: Couldn’t find army ID for `{canon}`.")
+            params = {
+                "limit":         10,
+                "placingsType":  "army",
+                "leagueId":      ITC_LEAGUE_ID,
+                "regionId":      ITC_REGION_ID,
+                "sortAscending": "false",
+                "armyId":        army["id"]
+            }
+        else:
+            # overall top-10 players
+            params = {
+                "limit":         10,
+                "placingsType":  "player",
+                "leagueId":      ITC_LEAGUE_ID,
+                "regionId":      ITC_REGION_ID,
+                "sortAscending": "false"
+            }
+
+        # 3) fetch the placings
+        resp = await session.get(
+            "https://newprod-api.bestcoastpairings.com/v1/placings",
+            params=params,
+            headers=headers
+        )
+        resp.raise_for_status()
+        entries = (await resp.json()).get("data", [])
+
+    if not entries:
+        return await ctx.send(":warning: No ITC standings found.")
+
+    # 4) build the table
+    header = "Placing | Name                     | Points"
+    divider = "-" * len(header)
+    lines = [header, divider]
+
+    for e in entries:
+        placing = e.get("placing", "")
+        user = e.get("user", {})
+        name = f"{user.get('firstName','')} {user.get('lastName','')}".strip()
+        pts = e.get("ITCPoints", e.get("totalPoints", 0))
+        lines.append(f"{placing:<7} | {name:<24} | {pts:>7.2f}")
+
+    # 5) send in a single code block (it’s short)
+    await ctx.send("```" + "\n".join(lines) + "```")
+
 aos_bot.remove_command('help')
 @aos_bot.command(name='help', help='List all AoS bot commands')
 async def help_cmd(ctx):
