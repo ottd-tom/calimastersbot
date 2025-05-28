@@ -808,13 +808,17 @@ Question:
 """
 
     try:
-        openai.api_key = os.getenv("OPENAI_API_KEY")
-        response = openai.ChatCompletion.create(
+        from openai import OpenAI
+        
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        
+        response = client.chat.completions.create(
             model="gpt-4",
-            messages=[{"role": "user", "content": prompt}],
+            messages=[{"role": "system", "content": "You are TomBot, a rude and sarcastic Discord bot. Be blunt. Call out dumb questions."},
+                      {"role": "user", "content": prompt}],
             temperature=0.4,
         )
-        reply = response['choices'][0]['message']['content']
+        reply = response.choices[0].message.content
         await ctx.send(reply[:2000])  # Discord limit
     except Exception as e:
         await ctx.send(f"Error: {str(e)}")
