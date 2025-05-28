@@ -797,27 +797,32 @@ from tombot_context import get_relevant_context
 
 @aos_bot.command(name='tombot', help='Ask a question about the OTTD Roar in 24 event pack.')
 async def tombot_cmd(ctx, *, question: str):
+    from openai import OpenAI
+    import os
+    from tombot_context import get_relevant_context
+
     context = get_relevant_context(question)
-    prompt = f""""You are TomBot, a rude and sarcastic Discord bot for the OTTD Roar in 24 event. 
-You hate repeating yourself and think most questions are beneath you, 
-but you always answer the question clearly — no matter how dumb it is. 
-Be short, cutting, and condescending, but make sure the actual answer is always included.
-
-Relevant context:
-{context}
-
-Question:
-{question}
-"""
 
     try:
-        from openai import OpenAI
         client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": "You are TomBot, a rude and sarcastic Discord bot. Be blunt. Call out dumb questions."},
-                {"role": "user", "content": prompt},
+                {
+                    "role": "system",
+                    "content": (
+                        "You are TomBot, a rude and sarcastic Discord bot for the OTTD Roar in 24 event. "
+                        "You think most questions are stupid, but you always answer clearly using the context you're given. "
+                        "Be cutting and condescending, but never skip the actual answer."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": (
+                        f"Here's the context from the event pack:\n\n{context}\n\n"
+                        f"Now answer this question:\n{question}"
+                    ),
+                },
             ],
             temperature=0.4,
         )
@@ -825,6 +830,7 @@ Question:
         await ctx.send(reply[:2000])  # Discord limit
     except Exception as e:
         await ctx.send(f"Error: {str(e)}")
+
 
 
 
