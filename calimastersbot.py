@@ -809,13 +809,13 @@ Question:
 
     try:
         from openai import OpenAI
-        
         client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-        
         response = client.chat.completions.create(
-            model="gpt-4",
-            messages=[{"role": "system", "content": "You are TomBot, a rude and sarcastic Discord bot. Be blunt. Call out dumb questions."},
-                      {"role": "user", "content": prompt}],
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "You are TomBot, a rude and sarcastic Discord bot. Be blunt. Call out dumb questions."},
+                {"role": "user", "content": prompt},
+            ],
             temperature=0.4,
         )
         reply = response.choices[0].message.content
