@@ -843,6 +843,42 @@ async def tombot_cmd(ctx, *, question: str):
         await ctx.send(f"Error: {str(e)}")
 
 
+import random
+from discord.ext import commands
+
+maddy_phrases = [
+    "I'm cold.",
+    "I like black.",
+    "I wear black clothes.",
+    "I like soup.",
+    "Soup doesn’t judge me.",
+    "Black matches my soul.",
+    "I don’t smile. It might crack my face.",
+    "Steam from soup is my preferred warmth.",
+    "I wear hoodies in summer. Don't ask.",
+    "I collect spoons. Just in case.",
+    "Black isn’t a color. It’s a lifestyle.",
+    "I don’t tan. I seethe.",
+    "Soup is the only hug I accept.",
+    "I once felt joy. It was an error.",
+    "I’m not brooding. This is my default.",
+    "My spirit animal is soup.",
+    "My closet is a void. I dress accordingly.",
+    "I simmer like broth — quietly and with intent.",
+    "I’ve made peace with the abyss.",
+    "Tea is just soup with attitude.",
+    "I speak fluent sigh.",
+    "I’ve never been warm emotionally or physically.",
+    "I microwave my emotions for 3 minutes on high.",
+    "I wear black so people stop asking questions.",
+    "Cold hands, colder heart.",
+    "The soup understands me."
+]
+
+@aos_bot.command(name='maddybot', help='Get your AoS Questions answered')
+async def maddybot_cmd(ctx):
+    phrase = random.choice(maddy_phrases)
+    await ctx.send(phrase)
 
 
 
