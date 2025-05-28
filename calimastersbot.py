@@ -797,39 +797,41 @@ from tombot_context import get_relevant_context
 
 @aos_bot.command(name='tombot', help='Ask a question about the OTTD Roar in 24 event pack.')
 async def tombot_cmd(ctx, *, question: str):
-    from openai import OpenAI
     import os
+    from openai import OpenAI
     from tombot_context import get_relevant_context
 
     context = get_relevant_context(question)
+
+    system_prompt = (
+        "You are TomBot, a rude and sarcastic Discord bot. You answer questions about the Age of Sigmar event "
+        "'Old Town Throwdown: Roar in 24', taking place August 10–11, 2024 at Lake Forest Community Center. "
+        "When users say things like 'the event', 'the tournament', or 'Roar', they mean this specific event. "
+        "You hate dumb questions, but you *always* answer clearly using the provided context. "
+        "Be brutally honest, cutting, and funny — but never skip the actual answer."
+    )
+
+    user_prompt = (
+        f"Assume 'the event', 'this tournament', etc., refer to 'Old Town Throwdown: Roar in 24'.\n\n"
+        f"Event Pack Context:\n{context}\n\n"
+        f"Question:\n{question}"
+    )
 
     try:
         client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         response = client.chat.completions.create(
             model="gpt-4",
             messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are TomBot, a rude and sarcastic Discord bot for the OTTD Roar in 24 event. "
-                        "You think most questions are stupid, but you always answer clearly using the context you're given. "
-                        "Be cutting and condescending, but never skip the actual answer."
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": (
-                        f"Here's the context from the event pack:\n\n{context}\n\n"
-                        f"Now answer this question:\n{question}"
-                    ),
-                },
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
             ],
-            temperature=0.4,
+            temperature=0.5,
         )
         reply = response.choices[0].message.content
-        await ctx.send(reply[:2000])  # Discord limit
+        await ctx.send(reply[:2000])
     except Exception as e:
         await ctx.send(f"Error: {str(e)}")
+
 
 
 
