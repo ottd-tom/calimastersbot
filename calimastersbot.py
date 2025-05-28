@@ -794,6 +794,7 @@ async def servers(ctx):
 
 import openai
 from tombot_context import get_relevant_context
+from tombot_context_manual import get_manual_context_gpt
 
 @aos_bot.command(name='tombot', help='Ask a question about the OTTD Roar in 24 event pack.')
 async def tombot_cmd(ctx, *, question: str):
@@ -801,7 +802,7 @@ async def tombot_cmd(ctx, *, question: str):
     from openai import OpenAI
     from tombot_context import get_relevant_context
 
-    context = get_relevant_context(question)
+    context = get_manual_context_gpt(question, client)
 
     system_prompt = (
         "You are TomBot, a rude and sarcastic Discord bot. You answer questions about the Age of Sigmar event "
