@@ -264,7 +264,7 @@ Dais Arcanum:  Replace the final sentence with:
 ________________
 
 
-Round 1 Shifting Objectives (1:4)
+Round 1 Mission: Shifting Objectives (1:4)
 Scoring
    * Score 1 victory point for each secondary objective you control.
    * Score 2 victory points if you control the primary objective.
@@ -308,7 +308,7 @@ Map B
 ________________
 
 
-Round 2 Jaws of Gallet (1:6)
+Round 2 Mission: Jaws of Gallet (1:6)
 Scoring
    * Score 2 victory points if you control at least 1 objective.
    * Score 2 victory points if you control 2 or more objectives.
@@ -361,7 +361,7 @@ Map C
 
 	
 
-Round 3 Close to the Chest (2:5)
+Round 3 Mission: Close to the Chest (2:5)
 Scoring
    * Score 1 victory points if you control at least 1 objective.
    * Score 1 victory points if you control 2 or more objectives.
@@ -416,7 +416,7 @@ Map E
 	________________
 
 
-Round 4 Limited Resources (2:6)
+Round 4 Mission: Limited Resources (2:6)
 Scoring
    * Score 2 victory points if you control at least 1 objective.
    * Score 2 victory points if you control 2 or more objectives.
@@ -460,7 +460,7 @@ Map L
 	________________
 
 
-Round 5 Feral Foray (1:5)
+Round 5 Mission: Feral Foray (1:5)
 Scoring
    * Score 2 victory points if you control at least 1 objective.
    * Score 2 victory points if you control 2 or more objectives.
