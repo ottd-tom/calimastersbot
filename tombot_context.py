@@ -1,11 +1,26 @@
-# tombot_context.py
+import re
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
 with open("OTTD Roar in 24.txt", "r", encoding="utf-8") as f:
     PACK_TEXT = f.read()
 
-CHUNKS = [PACK_TEXT[i:i+500] for i in range(0, len(PACK_TEXT), 500)]
+def split_into_chunks(text, max_chunk_length=500):
+    paragraphs = re.split(r"\n{2,}", text)
+    chunks = []
+    current_chunk = ""
+
+    for para in paragraphs:
+        if len(current_chunk) + len(para) < max_chunk_length:
+            current_chunk += para + "\n\n"
+        else:
+            chunks.append(current_chunk.strip())
+            current_chunk = para + "\n\n"
+    if current_chunk:
+        chunks.append(current_chunk.strip())
+    return chunks
+
+CHUNKS = split_into_chunks(PACK_TEXT)
 VEC = TfidfVectorizer().fit(CHUNKS)
 VEC_MATRIX = VEC.transform(CHUNKS)
 
