@@ -11,7 +11,8 @@ TOPIC_FILES = {
     "terrain": "context_terrain.txt",
     "prizes": "context_prizes.txt",
     "rules": "context_rules.txt",
-    "faq": "context_faq.txt"
+    "faq": "context_faq.txt",
+    "other": "context_other.txt"
 }
 
 def detect_topic_gpt(question, openai_client=None):
@@ -37,7 +38,8 @@ def detect_topic_gpt(question, openai_client=None):
     )
 
     answer = response.choices[0].message.content.strip().lower()
-    return answer if answer in TOPIC_FILES else "faq"
+    return answer if answer in TOPIC_FILES else "other"
+
 
 def get_manual_context_gpt(question, openai_client, context_dir="."):
     topic = detect_topic_gpt(question, openai_client)
