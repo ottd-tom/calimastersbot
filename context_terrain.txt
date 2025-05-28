@@ -1,0 +1,5 @@
+Each table will include a predefined set of terrain pieces as part of the table layout.
+
+Terrain will follow standard AoS rules with enhancements specified per table (e.g., Inspiring, Arcane, etc).
+
+Maps will be available in the player pack and online before the event. Deployment zones may be marked on select tables.

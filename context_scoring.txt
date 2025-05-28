@@ -1,0 +1,12 @@
+ROUND SCORING AND PLACINGS
+This tournament uses capped battle point difference as the tournament ranking tiebreaker system (after number of wins). Each round, the difference between your opponent’s score and your score added to 20 (capped between 0 and 40) will be the tournament score for that round.
+
+For example:
+If the score of your game is 46-38, your round score will be 28.
+If the score of your game is 32-50, your round score will be 2.
+If the score of your game is 44-18, your round score will be 40.
+If the score of your game is 24-50, your round score will be 0.
+
+In the event of a tie between multiple players’ tournament scores after five rounds, opponent’s win percentage will be the second tiebreaker.
+
+When entering your score into BCP, please enter the actual game result. BCP will calculate the capped battle point score automatically for you. Enter the number of battle tactics scored as well.
