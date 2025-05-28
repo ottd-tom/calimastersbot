@@ -1,1 +1,4 @@
+PAIRINGS
+Pairings will be random in the first round. The second through 4th rounds will be random within win bracket. The final round will be swiss (top-down) pairings.
 
+If there is an odd number of players, one player may receive a Bye. In the first round of the tournament the Bye is chosen at random and receives 40 points. In the subsequent rounds the Bye receives 30 points.
