@@ -29,8 +29,7 @@ def detect_topic_gpt(question, openai_client=None):
             {"role": "system", "content": (
                 "You are a classifier for Roar in 24 Age of Sigmar event questions. "
                 "Your job is to assign one topic label to each question, based on the most relevant match. "
-                "Choose only one topic from this list:
-"
+                "Choose only one topic from this list: "
                 "['scoring', 'venue', 'painting', 'schedule', 'lists', 'terrain', 'prizes', 'rules', 'faq']"
             )},
             {"role": "user", "content": f"Question: {question}\nAnswer:"}
