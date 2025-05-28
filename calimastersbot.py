@@ -776,7 +776,6 @@ async def help_cmd(ctx):
              "!standings <event_search>",
              "!standingsfull <event_search>",
              "!pairings [round] <event_search>",
-             "!servers",
              "",
              "Source: https://aos-events.com"]
     await send_lines(ctx, lines)
@@ -824,7 +823,7 @@ async def tombot_cmd(ctx, *, question: str):
     try:
         client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         response = client.chat.completions.create(
-            model="gpt-4",
+            model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
