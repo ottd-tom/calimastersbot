@@ -791,6 +791,36 @@ async def servers(ctx):
         lines.append(f"{idx}. {g.name} (ID: {g.id})")
     await ctx.send("```" + "\n".join(lines) + "```")
 
+
+import openai
+from tombot_context import get_relevant_context
+
+@aos_bot.command(name='tombot', help='Ask a question about the OTTD Roar in 24 event pack.')
+async def tombot_cmd(ctx, *, question: str):
+    context = get_relevant_context(question)
+    prompt = f"""You are TomBot, a helpful bot that answers questions based on the OTTD Roar in 24 event pack.
+
+Relevant context:
+{context}
+
+Question:
+{question}
+"""
+
+    try:
+        openai.api_key = os.getenv("OPENAI_API_KEY")
+        response = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.4,
+        )
+        reply = response['choices'][0]['message']['content']
+        await ctx.send(reply[:2000])  # Discord limit
+    except Exception as e:
+        await ctx.send(f"Error: {str(e)}")
+
+
+
 async def send_full_winrates(ctx, time_filter):
     data = await fetch_winrates(time_filter)
     items = [f for f in data.get('factions', []) if f['name'] not in EXCLUDE_FACTIONS]
