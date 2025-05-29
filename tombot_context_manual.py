@@ -57,7 +57,7 @@ def get_manual_context_gpt(question, openai_client, context_dir="."):
 
     try:
         with open(path, "r", encoding="utf-8") as f:
-            return f.read()
+            return topic, f.read()
     except Exception as e:
         return topic, f"Error reading context file '{file}': {str(e)}"
 
