@@ -13,6 +13,7 @@ TOPIC_FILES = {
     "rules": "context_rules.txt",
     "faq": "context_faq.txt",
     "pairings": "context_pairings.txt",
+    "players": "context_players.txt",
     "other": "context_other.txt"
 }
 
@@ -32,7 +33,7 @@ def detect_topic_gpt(question, openai_client=None):
                 "You are a classifier for Roar in 24 Age of Sigmar event questions. "
                 "Your job is to assign one topic label to each question, based on the most relevant match. "
                 "Choose only one topic from this list: "
-                "['scoring', 'venue', 'painting', 'schedule', 'lists', 'terrain', 'prizes', 'rules', 'faq', 'pairings']"
+                "['scoring', 'venue', 'painting', 'schedule', 'lists', 'terrain', 'prizes', 'rules', 'faq', 'pairings','players']"
             )},
             {"role": "user", "content": f"Question: {question}\nAnswer:"}
         ]
