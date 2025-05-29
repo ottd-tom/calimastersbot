@@ -47,17 +47,17 @@ def get_manual_context_gpt(question, openai_client, context_dir="."):
     topic = detect_topic_gpt(question, openai_client)
     file = TOPIC_FILES.get(topic)
     if not file:
-        return f"Sorry, I don’t have a context file for topic: {topic}"
+        return topic, f"Sorry, I don’t have a context file for topic: {topic}"
 
     path = os.path.join(context_dir, file)
     print(f"[TomBot] Topic: {topic} | File: {file} | Path: {path}")
 
     if not os.path.exists(path):
-        return f"Error: Couldn’t find the file '{file}' at path: {path}"
+        return topic, f"Error: Couldn’t find the file '{file}' at path: {path}"
 
     try:
         with open(path, "r", encoding="utf-8") as f:
             return f.read()
     except Exception as e:
-        return f"Error reading context file '{file}': {str(e)}"
+        return topic, f"Error reading context file '{file}': {str(e)}"
 
