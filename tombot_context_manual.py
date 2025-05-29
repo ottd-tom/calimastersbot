@@ -30,12 +30,11 @@ def detect_topic_gpt(question, openai_client=None):
         temperature=0,
         messages=[
             {"role": "system", "content": (
-                "You are a classifier for Summer Strike Age of Sigmar event questions. "
-                "Your job is to assign one topic label to each question, based on the most relevant match. "
-                "Choose only one topic from this list: ['scoring', 'venue', 'painting', 'schedule', 'lists', 'terrain', 'prizes', 'rules', 'faq', 'pairings', 'players'].
-
-                Questions about who is likely to win or how strong a player is or who can play should be classified under 'players'."
-
+                """You are a classifier for Summer Strike Age of Sigmar event questions. 
+    Your job is to assign one topic label to each question, based on the most relevant match. 
+    Choose only one topic from this list: ['scoring', 'venue', 'painting', 'schedule', 'lists', 'terrain', 'prizes', 'rules', 'faq', 'pairings', 'players'].
+    
+    Questions about who is likely to win or how strong a player is or who can play should be classified under 'players'."""
             )},
             {"role": "user", "content": f"Question: {question}\nAnswer:"}
         ]
