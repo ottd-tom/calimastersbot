@@ -830,7 +830,7 @@ async def tombot_cmd(ctx, *, question: str):
 
 
     user_prompt = (
-        "Pretend you’re talking to someone who just walked up and asked a really obvious, annoying question about 'Old Town Throwdown: Roar in 24'. "
+        "Pretend you’re talking to someone who just walked up and asked a really obvious, annoying question about 'Old Town Throwdown: Summer Strike'. "
         "Your job is to give them the answer, but also roast them for wasting your time.\n\n"
         f"Question:\n{question}"
     )
