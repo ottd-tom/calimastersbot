@@ -38,3 +38,6 @@ Player: Kyle Kalip
 Player: Adam Beautement
 - Likes to use big words.
 - Underperforms.
+
+Player: Fred Whitney
+- So, so old.
