@@ -872,7 +872,16 @@ maddy_phrases = [
     "I microwave my emotions for 3 minutes on high.",
     "I wear black so people stop asking questions.",
     "Cold hands, colder heart.",
-    "The soup understands me."
+    "The soup understands me.",
+    "I’m not short. I’m concentrated.",
+    "I’m closer to the soup. Advantage: me.",
+    "I don’t have to duck for anything. Ever.",
+    "The air down here is just fine, thanks.",
+    "I don’t look up to anyone. Literally.",
+    "Low effort? No. Low height.",
+    "I can hide behind terrain. Like, any terrain.",
+    "My reach is emotional, not physical.",
+    "Chairs are just unnecessarily tall tables."
 ]
 
 @aos_bot.command(name='maddybot', help='Get your AoS Questions answered')
