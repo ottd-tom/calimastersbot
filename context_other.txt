@@ -1,6 +1,3 @@
-PAIRINGS
-Pairings will be random in the first round. The second through 4th rounds will be random within win bracket. The final round will be swiss (top-down) pairings.
-
 ROUND TIMING
 Each round is 3 hours.
 
