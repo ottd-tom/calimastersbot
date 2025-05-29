@@ -14,6 +14,7 @@ TOPIC_FILES = {
     "faq": "context_faq.txt",
     "pairings": "context_pairings.txt",
     "players": "context_players.txt",
+    "missions": "context_missions.txt",
     "other": "context_other.txt"
 }
 
@@ -34,7 +35,7 @@ def detect_topic_gpt(question, openai_client=None):
     Your job is to assign one topic label to each question, based on the most relevant match. 
     Choose only one topic from this list: ['scoring', 'venue', 'painting', 'schedule', 'lists', 'terrain', 'prizes', 'rules', 'faq', 'pairings', 'players'].
     
-    Questions about who is likely to win or how strong a player is or who can play should be classified under 'players'."""
+    Questions about who is likely to win or how strong a player is or who can play should be classified under 'players'. Questions about missions, plans or what we're playing should be classified under 'missions'."""
             )},
             {"role": "user", "content": f"Question: {question}\nAnswer:"}
         ]
