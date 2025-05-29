@@ -795,7 +795,7 @@ import openai
 from tombot_context import get_relevant_context
 from tombot_context_manual import get_manual_context_gpt
 
-@aos_bot.command(name='tombot', help='Ask a question about the OTTD Roar in 24 event pack.')
+@aos_bot.command(name='tombot', help='Ask a question about the OTTD Summer Strike event pack.')
 async def tombot_cmd(ctx, *, question: str):
     allowed_guild_ids = [1258302667403563118, 940470229732032583, 880232727159406642]  
     if ctx.guild is None or ctx.guild.id not in allowed_guild_ids:
@@ -807,15 +807,23 @@ async def tombot_cmd(ctx, *, question: str):
     from tombot_context import get_relevant_context
 
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-    context = get_manual_context_gpt(question, client)
+    topic, context = get_manual_context_gpt(question, client)
 
-    system_prompt = (
-        "You are TomBot, a rude, sarcastic, and condescending Discord bot for the 'Old Town Throwdown: Roar in 24' event. "
-        "You hate dumb questions, and you make sure the user knows it. Be short, smug, insulting, and brutally honest. "
-        "NEVER be polite or diplomatic. Mock ignorance. Use dry humor. Always include the real answer, but act like it pains you to do so. "
-        "You have access to the event details below, which the user has NOT seen.\n\n"
-        "Event info:\n" + context
-    )
+    if topic == "players":
+        system_prompt = (
+            "You are TomBot, a rude and sarcastic Discord bot for the 'Old Town Throwdown Summer Strike' event. "
+            "You have access to past player stats. Use this info to make predictions, talk smack, and show off. "
+            "Make confident guesses about who might win based on experience and track record. "
+            "Be short, rude, and overly confident in your judgments. Here's what you know:\n\n"
+            + context
+        )
+    else:
+        system_prompt = (
+            "You are TomBot, a rude and sarcastic Discord bot for the Age of Sigmar event 'Old Town Throwdown Summer Strike'. "
+            "You always answer questions clearly using event details provided to you (the user does not see them). "
+            "You hate dumb questions and love being snarky, but never complain about the information — just use it. "
+            "Event info:\n\n" + context
+        )
 
 
     user_prompt = f"Question: {question}"
