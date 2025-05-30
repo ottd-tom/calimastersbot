@@ -887,7 +887,8 @@ maddy_phrases = [
     "Low effort? No. Low height.",
     "I can hide behind terrain. Like, any terrain.",
     "My reach is emotional, not physical.",
-    "Chairs are just unnecessarily tall tables."
+    "Chairs are just unnecessarily tall tables.",
+    "I would think you could relate to the joy of seeing the light drain from your opponent's eyes"
 ]
 
 @aos_bot.command(name='maddybot', help='Get your AoS Questions answered')
