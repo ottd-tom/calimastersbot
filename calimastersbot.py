@@ -792,7 +792,6 @@ async def servers(ctx):
 
 
 import openai
-from tombot_context import get_relevant_context
 from tombot_context_manual import get_manual_context_gpt
 
 @aos_bot.command(name='tombot', help='Ask a question about the OTTD Summer Strike event pack.')
