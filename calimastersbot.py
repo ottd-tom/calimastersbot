@@ -803,7 +803,6 @@ async def tombot_cmd(ctx, *, question: str):
     
     import os
     from openai import OpenAI
-    from tombot_context import get_relevant_context
 
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
     topic, context = get_manual_context_gpt(question, client)
