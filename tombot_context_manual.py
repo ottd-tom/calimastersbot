@@ -15,6 +15,7 @@ TOPIC_FILES = {
     "pairings": "context_pairings.txt",
     "players": "context_players.txt",
     "missions": "context_missions.txt",
+    "food":    "context_food.txt",
     "other": "context_other.txt"
 }
 
@@ -33,7 +34,7 @@ def detect_topic_gpt(question, openai_client=None):
             {"role": "system", "content": (
                 """You are a classifier for Summer Strike Age of Sigmar event questions. 
     Your job is to assign one topic label to each question, based on the most relevant match. 
-    Choose only one topic from this list: ['scoring', 'venue', 'painting', 'schedule', 'lists', 'terrain', 'prizes', 'rules', 'faq', 'pairings', 'players'].
+    Choose only one topic from this list: ['scoring', 'venue', 'painting', 'schedule', 'lists', 'terrain', 'prizes', 'rules', 'faq', 'pairings', 'players', 'food'].
     
     Questions about who is likely to win or how strong a player is or who can play should be classified under 'players'. Questions about missions, plans or what we're playing should be classified under 'missions'."""
             )},
