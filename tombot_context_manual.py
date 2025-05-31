@@ -28,7 +28,7 @@ def detect_topic_gpt(question, openai_client=None):
         return "faq"  # fallback in test mode
 
     response = openai_client.chat.completions.create(
-        model="gpt-3.5-turbo",
+        model="gpt-4",
         temperature=0,
         messages=[
             {"role": "system", "content": (
