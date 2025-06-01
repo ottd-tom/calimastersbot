@@ -896,7 +896,31 @@ async def maddybot_cmd(ctx):
     phrase = random.choice(maddy_phrases)
     await ctx.send(phrase)
 
+tomg_phrases = [
+    "lig",
+    "neat",
+    "nice",
+    "L",
+    "Holy",
+    "Based",
+    "Whoa",
+    "More rats",
+    "lig",
+    "neat",
+    "nice",
+    "L",
+    "Holy",
+    "Based",
+    "Whoa",
+    "Where's the nearest Olive Garden?",
+    "Miss home.  Where's nearest Panda Express?",
+    "Gotta go raid"
+]
 
+@aos_bot.command(name='tomgbot', help='Get your AoS Questions answered')
+async def tomgbot_cmd(ctx):
+    phrase = random.choice(tomg_phrases)
+    await ctx.send(phrase)
 
 async def send_full_winrates(ctx, time_filter):
     data = await fetch_winrates(time_filter)
