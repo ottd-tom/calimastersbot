@@ -915,7 +915,10 @@ tomg_phrases = [
     "Where's the nearest Olive Garden?",
     "Miss home.  Where's nearest Panda Express?",
     "Gotta go raid",
-    "Toms are so smart"
+    "Toms are so smart",
+    "fish",
+    "wow",
+    
 ]
 
 @aos_bot.command(name='tomgbot', help='Get your AoS Questions answered')
