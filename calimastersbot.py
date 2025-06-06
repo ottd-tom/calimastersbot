@@ -918,7 +918,8 @@ tomg_phrases = [
     "Toms are so smart",
     "fish",
     "wow",
-    "sad"    
+    "sad",
+    "snap"
 ]
 
 @aos_bot.command(name='tomgbot', help='Get your AoS Questions answered')
