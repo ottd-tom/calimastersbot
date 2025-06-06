@@ -927,6 +927,18 @@ async def tomgbot_cmd(ctx):
     phrase = random.choice(tomg_phrases)
     await ctx.send(phrase)
 
+gavin_phrases = [
+    "Do it pussy"
+]
+
+@aos_bot.command(name='gavbot', help='Get your AoS Questions answered')
+async def gavbot_cmd(ctx):
+    phrase = random.choice(gavin_phrases)
+    await ctx.send(phrase)
+
+
+
+
 async def send_full_winrates(ctx, time_filter):
     data = await fetch_winrates(time_filter)
     items = [f for f in data.get('factions', []) if f['name'] not in EXCLUDE_FACTIONS]
@@ -939,6 +951,7 @@ async def send_full_winrates(ctx, time_filter):
         lines.append(f"{emoji} {f['name']}: {f['wins']}/{f['games']} ({pct:.2f}%)")
     lines += ['', 'Source: https://aos-events.com']
     await send_lines(ctx, lines)
+
 
 async def send_single(ctx, key, time_filter):
     name = ALIAS_MAP[key]
