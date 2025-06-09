@@ -936,6 +936,13 @@ async def gavbot_cmd(ctx):
     phrase = random.choice(gavin_phrases)
     await ctx.send(phrase)
 
+adam_phrases = [
+    "I feel like one on one I outnumber most of the SoCal Warhammer scene"
+]
+@aos_bot.command(name='adambot', help='Get your AoS Questions answered')
+async def adambot_cmd(ctx):
+    phrase = random.choice(adam_phrases)
+    await ctx.send(phrase)
 
 
 
