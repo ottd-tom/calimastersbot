@@ -683,6 +683,130 @@ async def pairings_cmd(ctx, *, args: str):
 
     await ctx.send("Multiple events found—please pick one:", view=PairingsView(matches, ctx))
 
+
+
+
+
+
+
+
+
+@aos_bot.command(name='itcrank', aliases=['crankit'], help='Show ITC placing and points for a player (via BCP API)')
+async def itcrank_cmd(ctx, *, name: str):
+    name = name.strip()
+    if len(name) < 3:
+        return await ctx.send("Please provide at least 3 characters for the name search.")
+
+    headers = {
+        'Accept':       'application/json',
+        'x-api-key':    BCP_API_KEY,
+        'client-id':    CLIENT_ID,
+        'User-Agent':   'AoS-ITCCrank-Bot',
+    }
+    params = {
+        "limit":         500,
+        "placingsType":  "player",
+        "leagueId":      ITC_LEAGUE_ID,
+        "regionId":      ITC_REGION_ID,
+        "sortAscending": "false"
+    }
+
+    # fetch full top-N then filter by name substring
+    async with aiohttp.ClientSession() as session:
+        resp = await session.get(
+            f"{BASE_EVENT_URL.replace('/events','')}/placings",
+            params=params,
+            headers=headers
+        )
+        resp.raise_for_status()
+        data = (await resp.json()).get("data", [])
+
+    key = name.lower()
+    matches = [
+        e for e in data
+        if key in f"{e['user'].get('firstName','')} {e['user'].get('lastName','')}".lower()
+    ]
+    if not matches:
+        return await ctx.send(f"No ITC placings found for **{name}**.")
+
+    lines = [f"**ITC Placings for “{name}”**"]
+    for rec in matches:
+        fn      = rec['user'].get('firstName','')
+        ln      = rec['user'].get('lastName','')
+        placing = rec.get('placing')
+        pts     = rec.get('ITCPoints', rec.get('totalPoints', 0))
+        lines.append(f"{fn} {ln} — Placing: {placing}, Points: {pts:.2f}")
+
+    await send_lines(ctx, lines)
+
+
+# ─── WHO IS BETTER ────────────────────────────────────────────────────────────
+@aos_bot.command(
+    name='whoisbetter',
+    help='Compare two players by ITC placing via BCP. Usage: !whoisbetter <name1> <name2> OR !whoisbetter <name1> or <name2>'
+)
+async def whoisbetter_cmd(ctx, *, query: str):
+    # parse names
+    parts = re.split(r'\s+or\s+', query, flags=re.IGNORECASE)
+    if len(parts) == 2:
+        name1, name2 = parts[0].strip(), parts[1].strip()
+    else:
+        toks = query.split()
+        if len(toks) < 4:
+            return await ctx.send("Usage: `!whoisbetter <first1> <last1> <first2> <last2>` or `!whoisbetter <name1> or <name2>`")
+        name1 = f"{toks[0]} {toks[1]}"
+        name2 = f"{toks[2]} {toks[3]}"
+
+    # special jokes
+    if name1.lower()=="gareth thomas" or name2.lower()=="gareth thomas":
+        return await ctx.send("Gareth Thomas is morally and intellectually superior")
+
+    # helper to fetch & filter
+    async def fetch_for(name):
+        headers = {
+            'Accept':'application/json',
+            'x-api-key':BCP_API_KEY,
+            'client-id':CLIENT_ID,
+            'User-Agent':'AoS-WhoIsBetter-Bot',
+        }
+        params = {
+            "limit":         500,
+            "placingsType":  "player",
+            "leagueId":      ITC_LEAGUE_ID,
+            "regionId":      ITC_REGION_ID,
+            "sortAscending": "false"
+        }
+        async with aiohttp.ClientSession() as s:
+            r = await s.get(f"{BASE_EVENT_URL.replace('/events','')}/placings", params=params, headers=headers)
+            r.raise_for_status()
+            raw = (await r.json()).get("data", [])
+        key = name.lower()
+        return [e for e in raw if key in f"{e['user'].get('firstName','')} {e['user'].get('lastName','')}".lower()]
+
+    try:
+        data1 = await fetch_for(name1)
+        data2 = await fetch_for(name2)
+    except Exception as e:
+        return await ctx.send(f"Error fetching ITC data: {e}")
+
+    def best(data):
+        return None if not data else min(e.get('placing', float('inf')) for e in data)
+
+    best1, best2 = best(data1), best(data2)
+
+    if best1 is None and best2 is None:
+        return await ctx.send(f"No ITC data for either {name1} or {name2}.")
+    if best1 is None:
+        return await ctx.send(f"No ITC data for {name1}, but {name2} has best placing #{best2}. So {name2} is better!")
+    if best2 is None:
+        return await ctx.send(f"No ITC data for {name2}, but {name1} has best placing #{best1}. So {name1} is better!")
+    if best1 < best2:
+        return await ctx.send(f"{name1} (best placing #{best1}) is better than {name2} (best placing #{best2})!")
+    if best2 < best1:
+        return await ctx.send(f"{name2} (best placing #{best2}) is better than {name1} (best placing #{best1})!")
+    return await ctx.send(f"Both {name1} and {name2} share the same best placing of #{best1}! They're tied!")
+
+
 @aos_bot.command(name='itcstandings', help='Show top 10 ITC standings, optionally for a faction: !itcstandings [faction_alias]')
 async def itcstandings_cmd(ctx, faction: str = None):
     headers = {
