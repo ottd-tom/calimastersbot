@@ -1076,6 +1076,15 @@ async def barkerbot_cmd(ctx):
     phrase = random.choice(barker_phrases)
     await ctx.send(phrase)
 
+carl_phrases = [
+    "I'm gunna nut"
+]
+@aos_bot.command(name='carlbot', help='Get your AoS Questions answered')
+async def carlbot_cmd(ctx):
+    phrase = random.choice(carl_phrases)
+    await ctx.send(phrase)
+
+
 async def send_full_winrates(ctx, time_filter):
     data = await fetch_winrates(time_filter)
     items = [f for f in data.get('factions', []) if f['name'] not in EXCLUDE_FACTIONS]
