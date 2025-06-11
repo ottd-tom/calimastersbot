@@ -883,6 +883,89 @@ async def itcstandings_cmd(ctx, faction: str = None):
     # 5) send in a single code block (it’s short)
     await ctx.send("```" + "\n".join(lines) + "```")
 
+import re
+
+def parse_command(cmd):
+    data = {
+        "attacks": 0,
+        "hit": 0,
+        "wound": 0,
+        "rend": 0,
+        "damage": 0,
+        "damage_type": "flat",  # flat or dice
+        "crit_hit": False,
+        "crit_mw": False
+    }
+    
+    tokens = cmd.lower().split()
+    for token in tokens:
+        if match := re.match(r"(\d+)a", token):
+            data["attacks"] = int(match.group(1))
+        elif match := re.match(r"h(\d)\+", token):
+            data["hit"] = int(match.group(1))
+        elif match := re.match(r"w(\d)\+", token):
+            data["wound"] = int(match.group(1))
+        elif match := re.match(r"r(-?\d+)", token):
+            data["rend"] = int(match.group(1))
+        elif match := re.match(r"d(\d+)", token):
+            data["damage"] = int(match.group(1))
+            data["damage_type"] = "flat"
+        elif match := re.match(r"dd(\d+)", token):
+            data["damage"] = (int(match.group(1)) + 1) / 2  # avg of d3 or d6
+            data["damage_type"] = "dice"
+        elif token == "crit":
+            continue
+        elif token == "hit":
+            data["crit_hit"] = True
+        elif token == "mw":
+            data["crit_mw"] = True
+
+    return data
+
+def expected_damage(data, save_val):
+    to_hit = (7 - data["hit"]) / 6
+    to_wound = (7 - data["wound"]) / 6
+    save_pen = save_val + data["rend"]
+    fail_save = min(1.0, max(0.0, (save_pen - 1) / 6))
+    base_dmg = data["damage"]
+
+    normal_hits = data["attacks"] * to_hit
+    crit_hits = data["attacks"] * (1 / 6) if data["crit_hit"] or data["crit_mw"] else 0
+
+    if data["crit_mw"]:
+        # Crits bypass wound/save, do direct dmg
+        normal_hits -= crit_hits  # remove crits from normal path
+        mortal_wounds = crit_hits * base_dmg
+        normal_damage = normal_hits * to_wound * fail_save * base_dmg
+        return normal_damage + mortal_wounds
+    elif data["crit_hit"]:
+        extra_wounds = crit_hits * to_wound * fail_save * base_dmg
+        normal_damage = normal_hits * to_wound * fail_save * base_dmg
+        return normal_damage + extra_wounds
+    else:
+        return normal_hits * to_wound * fail_save * base_dmg
+
+def generate_table(data):
+    output = "Save    Unit 1\n"
+    for sv in range(2, 7):  # Save 2+ to 6+
+        dmg = expected_damage(data, sv)
+        output += f"{sv}+    {dmg:.2f}\n"
+    return output
+
+@aos_bot.command(
+    name='stathammer',
+    help='!stathammer <10a h2+ w3+ r-1 dd3 crit hit> — parse StatHammer command and display expected damage table for saves 2+ through 6+'
+)
+async def stathammer_cmd(ctx, *, cmd: str):
+    """
+    Parse a StatHammer‐style command string and return the expected damage table.
+    """
+    data  = parse_command(cmd)
+    table = generate_table(data)
+    # send in a code block so the columns stay aligned
+    await ctx.send(f"```{table}```")
+
+
 aos_bot.remove_command('help')
 @aos_bot.command(name='help', help='List all AoS bot commands')
 async def help_cmd(ctx):
