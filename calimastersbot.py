@@ -1068,7 +1068,13 @@ async def adambot_cmd(ctx):
     phrase = random.choice(adam_phrases)
     await ctx.send(phrase)
 
-
+barker_phrases = [
+    "Why would you think there would be a bot for 'Barker'?  There's literally nobody in the AoS community of note with that name."
+]
+@aos_bot.command(name='barkerbot', help='Get your AoS Questions answered')
+async def barkerbot_cmd(ctx):
+    phrase = random.choice(barker_phrases)
+    await ctx.send(phrase)
 
 async def send_full_winrates(ctx, time_filter):
     data = await fetch_winrates(time_filter)
