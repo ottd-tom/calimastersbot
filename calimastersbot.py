@@ -891,20 +891,35 @@ def expected_damage(
     to_wound: int,
     rend: int,
     save: int,
-    damage,              # int or 'd3' or 'd6'
+    damage,               # int or 'd3' or 'd6'
     crit_mortal: bool = False,
-    crit_auto_wound: bool = False
+    crit_auto_wound: bool = False,
+    crit_extra: bool = False,
+    crit_threshold: int = 6
 ) -> float:
-    # --- base probabilities ---
-    p_hit     = max(0.0, min((7 - to_hit) / 6.0, 1.0))
-    p_crit    = 1.0 / 6.0
+    """
+    Compute expected AoS damage, with adjustable crit threshold.
+    
+    crit_threshold: rolls >= this AND >= to_hit are “crits”
+    crit_mortal: each crit deals mortal wounds = damage (no wound/save)
+    crit_auto_wound: each crit auto-wounds (skip to-wound, roll save)
+    crit_extra: each crit also grants one extra normal hit
+    """
+    # base probs
+    p_hit = max(0.0, min((7 - to_hit) / 6.0, 1.0))
+    # crit only if roll >= both to_hit and crit_threshold
+    eff_thresh = max(to_hit, crit_threshold)
+    p_crit = max(0.0, min((7 - eff_thresh) / 6.0, 1.0))
     p_noncrit = max(0.0, p_hit - p_crit)
 
     p_wound = max(0.0, min((7 - to_wound) / 6.0, 1.0))
     eff_save = save - rend
-    if   eff_save <  2: p_save = 5/6
-    elif eff_save <= 6: p_save = (7 - eff_save) / 6.0
-    else:               p_save = 0.0
+    if eff_save < 2:
+        p_save = 5/6
+    elif eff_save <= 6:
+        p_save = (7 - eff_save) / 6.0
+    else:
+        p_save = 0.0
 
     # mean damage per unsaved wound
     if isinstance(damage, str):
@@ -917,84 +932,93 @@ def expected_damage(
     else:
         exp_dmg = float(damage)
 
-    # normal (non-6) hits
+    # normal non-crit hits
     e_norm = num_attacks * p_noncrit * p_wound * (1 - p_save) * exp_dmg
 
-    # crit hits (roll = 6)
+    # crit hits
     if crit_mortal:
-        # mortal wounds instead of normal wound
+        # mortal wounds instead of wound+save
         e_crit_base = num_attacks * p_crit * exp_dmg
     else:
-        # either auto-wound or normal wound
         if crit_auto_wound:
             e_crit_base = num_attacks * p_crit * (1 - p_save) * exp_dmg
         else:
             e_crit_base = num_attacks * p_crit * p_wound * (1 - p_save) * exp_dmg
 
-    # extra hit from each crit (always 1 extra)
-    e_extra = num_attacks * p_crit * p_wound * (1 - p_save) * exp_dmg
+    # extra hit per crit?
+    if crit_extra:
+        e_extra = num_attacks * p_crit * p_wound * (1 - p_save) * exp_dmg
+    else:
+        e_extra = 0.0
 
     return e_norm + e_crit_base + e_extra
 
 
 @aos_bot.command(
     name='stathammer',
-    help='Usage: !stathammer 15a 3h 4w 2r d6d [cm|cw|ch] — shows expected damage vs saves 2+–6+'
+    help='Usage: !stathammer 15a 3h 4w 2r d6d [<n>cm|cw|ch]'
 )
 async def stathammer_cmd(ctx, *, args: str):
     parts = args.split()
-    if len(parts) != 6:
+    if len(parts) not in (5, 6):
         return await ctx.send(
-            "⚠️ Usage: `!stathammer 15a 3h 4w 2r d6d [cm|cw|ch]`"
+            "⚠️ Usage: `!stathammer 15a 3h 4w 2r d6d [<n>cm|cw|ch]`"
         )
 
-    # parse tokens
     try:
         na   = int(re.fullmatch(r'([+-]?\d+)a', parts[0], re.I).group(1))
-        th   = int(re.fullmatch(r'(\d+)h',    parts[1], re.I).group(1))
-        tw   = int(re.fullmatch(r'(\d+)w',    parts[2], re.I).group(1))
-        rend = int(re.fullmatch(r'([+-]?\d+)r',parts[3], re.I).group(1))
+        th   = int(re.fullmatch(r'(\d+)h',     parts[1], re.I).group(1))
+        tw   = int(re.fullmatch(r'(\d+)w',     parts[2], re.I).group(1))
+        rend = int(re.fullmatch(r'([+-]?\d+)r', parts[3], re.I).group(1))
 
-        dmg_tok = parts[4].lower()
-        if dmg_tok in ('d3d','d6d'):
-            damage = dmg_tok[0:2]           # 'd3' or 'd6'
+        # parse damage token
+        dt = parts[4].lower()
+        if dt in ('d3d','d6d'):
+            damage = dt[:2]
         else:
-            # allow fixed-damage like '2d' or '5'
-            base = dmg_tok[:-1] if dmg_tok.endswith('d') else dmg_tok
+            base = dt[:-1] if dt.endswith('d') else dt
             damage = int(base)
 
-        flag = parts[5].lower()
-        if flag == 'cm':
-            crit_mortal     = True
-            crit_auto_wound = False
-        elif flag == 'cw':
-            crit_mortal     = False
-            crit_auto_wound = True
-        elif flag == 'ch':
-            crit_mortal     = False
-            crit_auto_wound = False
-        else:
-            raise ValueError("bad flag")
+        # defaults
+        crit_mortal = crit_auto_wound = crit_extra = False
+        crit_threshold = 6
+
+        if len(parts) == 6:
+            m = re.fullmatch(r'(\d)?(cm|cw|ch)', parts[5], re.I)
+            if not m:
+                raise ValueError
+            if m.group(1):
+                crit_threshold = int(m.group(1))
+            code = m.group(2).lower()
+            if code == 'cm':
+                crit_mortal = True;  crit_extra = True
+            elif code == 'cw':
+                crit_auto_wound = True;  crit_extra = True
+            elif code == 'ch':
+                crit_extra = True
+
     except Exception:
         return await ctx.send(
-            "❌ Could not parse arguments — please follow:\n"
-            "`!stathammer 15a 3h 4w 2r d6d [cm|cw|ch]`"
+            "❌ Parse error. Usage:\n"
+            "`!stathammer 15a 3h 4w 2r d6d [<n>cm|cw|ch]`"
         )
 
     # build and send table
     lines = ["```save   dmg"]
     for sv in range(2, 7):
         exp = expected_damage(
-            num_attacks    = na,
-            to_hit         = th,
-            to_wound       = tw,
-            rend           = rend,
-            save           = sv,
-            damage         = damage,
-            crit_mortal    = crit_mortal,
-            crit_auto_wound= crit_auto_wound
+            num_attacks     = na,
+            to_hit          = th,
+            to_wound        = tw,
+            rend            = rend,
+            save            = sv,
+            damage          = damage,
+            crit_mortal     = crit_mortal,
+            crit_auto_wound= crit_auto_wound,
+            crit_extra      = crit_extra,
+            crit_threshold  = crit_threshold
         )
-        lines.append(f"{sv:+}   {exp:6.2f}")
+        lines.append(f"{sv}+: {exp:6.2f}")
     lines.append("```")
 
     await ctx.send("\n".join(lines))
