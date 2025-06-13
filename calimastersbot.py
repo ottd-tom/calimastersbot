@@ -991,9 +991,9 @@ async def stathammer_cmd(ctx, *, args: str):
                 crit_threshold = int(m.group(1))
             code = m.group(2).lower()
             if code == 'cm':
-                crit_mortal = True;  crit_extra = True
+                crit_mortal = True; 
             elif code == 'cw':
-                crit_auto_wound = True;  crit_extra = True
+                crit_auto_wound = True; 
             elif code == 'ch':
                 crit_extra = True
 
