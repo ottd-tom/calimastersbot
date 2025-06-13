@@ -1041,6 +1041,7 @@ async def help_cmd(ctx):
              "!standings <event_search>",
              "!standingsfull <event_search>",
              "!pairings [round] <event_search>",
+             "!stathammer 15a 3h 4w 2r d6d [<n>cm|cw|ch]",
              "",
              "Source: https://aos-events.com"]
     await send_lines(ctx, lines)
