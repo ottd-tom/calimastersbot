@@ -913,7 +913,7 @@ def expected_damage(
     p_noncrit = max(0.0, p_hit - p_crit)
 
     p_wound = max(0.0, min((7 - to_wound) / 6.0, 1.0))
-    eff_save = save - rend
+    eff_save = save + rend
     if eff_save < 2:
         p_save = 5/6
     elif eff_save <= 6:
