@@ -1233,6 +1233,173 @@ async def playerwr_cmd(ctx, first_name: str, last_name: str):
     await send_lines(ctx, lines)
 
 
+# ─── WHO IS REALLY BETTER (AI-POWERED COMPARISON) ───────────────────────────────────
+@aos_bot.command(
+    name='whoisreallybetter',
+    help='Compare two players by ITC performance over the years using AI. Usage: !whoisreallybetter <name1> <name2> OR !whoisreallybetter <name1> or <name2>'
+)
+async def whoisreallybetter_cmd(ctx, *, query: str):
+    import openai # Import openai inside the function to keep it localized
+    from openai import OpenAI
+
+    # Check for OpenAI API key
+    openai_api_key = os.getenv("OPENAI_API_KEY")
+    if not openai_api_key:
+        return await ctx.send(":warning: OpenAI API key (OPENAI_API_KEY) is not set. Cannot use AI comparison.")
+    
+    # Parse names
+    parts = re.split(r'\s+or\s+', query, flags=re.IGNORECASE)
+    if len(parts) == 2:
+        name1_display, name2_display = parts[0].strip(), parts[1].strip()
+    else:
+        toks = query.split()
+        if len(toks) < 4:
+            return await ctx.send("Usage: `!whoisreallybetter <first1> <last1> <first2> <last2>` or `!whoisreallybetter <name1> or <name2>`")
+        name1_display = f"{toks[0]} {toks[1]}".strip()
+        name2_display = f"{toks[2]} {toks[3]}".strip()
+
+    # Special jokes (optional, can be removed if not desired for this command)
+    if name1_display.lower()=="gareth thomas" or name2_display.lower()=="gareth thomas":
+        return await ctx.send("Gareth Thomas is morally and intellectually superior. No AI needed here.")
+
+    await ctx.send(f"Consulting the ancient scrolls for {name1_display} vs {name2_display}... This might take a little longer as I analyze their full histories.")
+
+    player_names = {
+        'player1': name1_display,
+        'player2': name2_display
+    }
+    
+    all_players_yearly_stats = {}
+
+    async with aiohttp.ClientSession() as session: # Use a single session for all requests
+        for player_key, display_name in player_names.items():
+            player_name_for_search = display_name.lower()
+            yearly_stats = {}
+            found_player_id = None
+            total_wins_player = 0
+            total_ties_player = 0
+            total_losses_player = 0
+
+            years_to_process_ordered = [2025] + sorted([y for y in LEAGUE_YEARS if y != 2025], reverse=True)
+
+            for year in years_to_process_ordered:
+                league_id = LEAGUE_YEARS[year]
+                
+                if year == 2025:
+                    stats_with_id = await fetch_player_placings_for_year(
+                        session, player_name_for_search, league_id, year
+                    )
+                elif found_player_id:
+                    stats_with_id = await fetch_player_placings_for_year(
+                        session, player_name_for_search, league_id, year, target_user_id=found_player_id
+                    )
+                else:
+                    stats_with_id = None # Skip if ID not found from 2025
+
+                if stats_with_id:
+                    yearly_stats[year] = {k: v for k, v in stats_with_id.items() if k != 'userId'}
+                    if year == 2025: # Only update ID from the first successful fetch (2025)
+                        found_player_id = stats_with_id.get("userId")
+                else:
+                    yearly_stats[year] = {"wins": "N/A", "ties": "N/A", "losses": "N/A"}
+            
+            # Calculate yearly win rates and aggregate totals for the current player
+            for year in sorted(yearly_stats.keys()):
+                stats = yearly_stats[year]
+                if isinstance(stats["wins"], int) and isinstance(stats["ties"], int) and isinstance(stats["losses"], int):
+                    current_wins = stats["wins"]
+                    current_ties = stats["ties"]
+                    current_losses = stats["losses"]
+
+                    total_games_year = current_wins + current_ties + current_losses
+                    if total_games_year > 0:
+                        win_rate_year = (current_wins / total_games_year) * 100
+                        stats["win_rate"] = f"{win_rate_year:.2f}%"
+                    else:
+                        stats["win_rate"] = "N/A"
+                    
+                    total_wins_player += current_wins
+                    total_ties_player += current_ties
+                    total_losses_player += current_losses
+                else:
+                    stats["win_rate"] = "N/A"
+
+            # Calculate overall win rate for the current player
+            overall_total_games_player = total_wins_player + total_ties_player + total_losses_player
+            if overall_total_games_player > 0:
+                overall_win_rate_player_str = f"{(total_wins_player / overall_total_games_player) * 100:.2f}%"
+            else:
+                overall_win_rate_player_str = "N/A"
+
+            all_players_yearly_stats[player_key] = {
+                "display_name": display_name,
+                "yearly_stats": yearly_stats,
+                "overall_stats": {
+                    "wins": total_wins_player,
+                    "ties": total_ties_player,
+                    "losses": total_losses_player,
+                    "win_rate": overall_win_rate_player_str
+                }
+            }
+
+    # Prepare data for LLM
+    llm_prompt_data = []
+    for player_key, data in all_players_yearly_stats.items():
+        player_info = f"Player: {data['display_name']}\n"
+        player_info += "Yearly Stats:\n"
+        for year in sorted(data['yearly_stats'].keys(), reverse=True):
+            stats = data['yearly_stats'][year]
+            if isinstance(stats['wins'], int):
+                player_info += f"  {year}: {stats['wins']} Wins, {stats['ties']} Ties, {stats['losses']} Losses (Win Rate: {stats['win_rate']})\n"
+            else:
+                player_info += f"  {year}: No data recorded\n"
+        
+        overall_stats = data['overall_stats']
+        if isinstance(overall_stats['wins'], int):
+            player_info += f"Overall: {overall_stats['wins']} Wins, {overall_stats['ties']} Ties, {overall_stats['losses']} Losses (Overall Win Rate: {overall_stats['win_rate']})\n"
+        else:
+            player_info += f"Overall: No data recorded\n"
+        llm_prompt_data.append(player_info)
+
+    # Construct LLM prompt
+    system_prompt = (
+        "You are a sarcastic and witty Age of Sigmar ITC bot. "
+        "Your task is to analyze the provided player statistics and write a short, amusing, and concise paragraph "
+        "(under 250 words) comparing the two players. "
+        "Clearly state who is the 'better' player based *only* on the provided stats, or declare a tie/lack of data. "
+        "Highlight key statistical differences or trends in a humorous way. "
+        "Be direct and don't mince words. Avoid excessive fluff or disclaimers. "
+        "If a player has 'No data recorded', mention it directly in your witty assessment."
+    )
+
+    user_prompt = (
+        "Analyze the following player statistics and tell me who is better:\n\n"
+        f"{llm_prompt_data[0]}\n"
+        f"{llm_prompt_data[1]}\n"
+    )
+
+    try:
+        client = OpenAI(api_key=openai_api_key)
+        # Use asyncio.to_thread to run the synchronous OpenAI call in a separate thread
+        # so it doesn't block the Discord bot's async event loop.
+        response = await asyncio.to_thread(
+            client.chat.completions.create,
+            model="gpt-4o-mini", # Using gpt-4o-mini for cost-effectiveness and speed for text generation
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0.7, # A bit of creativity for wittiness
+        )
+        ai_response = response.choices[0].message.content
+        await ctx.send(f"**The ITC Prophet's Judgment (Powered by AI):**\n{ai_response}")
+
+    except Exception as e:
+        logging.error(f"Error generating AI comparison: {e}")
+        await ctx.send(f":warning: An error occurred while consulting the AI: {e}")
+
+
+
 aos_bot.remove_command('help')
 @aos_bot.command(name='help', help='List all AoS bot commands')
 async def help_cmd(ctx):
