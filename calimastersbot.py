@@ -423,7 +423,7 @@ async def do_standings_full(ctx, ev):
     headers = {'Accept':'application/json','x-api-key':BCP_API_KEY,'client-id':CLIENT_ID,'User-Agent':'AoSBot'}
     async with aiohttp.ClientSession() as session:
         async with session.get(f"{BASE_EVENT_URL}/{ev_id}/players",
-                               params={"placings":"true","limit":1500},
+                               params={"placings":"true","limit":500},
                                headers=headers) as presp:
             presp.raise_for_status(); raw = await presp.json()
     players = extract_players(raw)
@@ -438,7 +438,7 @@ async def do_standings_slim(ctx, ev):
     headers = {'Accept':'application/json','x-api-key':BCP_API_KEY,'client-id':CLIENT_ID,'User-Agent':'AoSBot'}
     async with aiohttp.ClientSession() as session:
         async with session.get(f"{BASE_EVENT_URL}/{ev_id}/players",
-                               params={"placings":"true","limit":1500},
+                               params={"placings":"true","limit":500},
                                headers=headers) as presp:
             presp.raise_for_status(); raw = await presp.json()
     players = extract_players(raw)
@@ -712,7 +712,7 @@ async def itcrank_cmd(ctx, *, name: str):
         'User-Agent':   'AoS-ITCCrank-Bot',
     }
     params = {
-        "limit":         1500,
+        "limit":         2000,
         "placingsType":  "player",
         "leagueId":      ITC_LEAGUE_ID,
         "regionId":      ITC_REGION_ID,
@@ -778,7 +778,7 @@ async def whoisbetter_cmd(ctx, *, query: str):
             'User-Agent':'AoS-WhoIsBetter-Bot',
         }
         params = {
-            "limit":         1500,
+            "limit":         2000,
             "placingsType":  "player",
             "leagueId":      ITC_LEAGUE_ID,
             "regionId":      ITC_REGION_ID,
@@ -1065,7 +1065,7 @@ async def fetch_player_placings_for_year(
         'User-Agent': 'AoS-ITCCrank-Bot',
     }
     params = {
-        "limit": 1500,  # Fetch a sufficiently large number to find the player
+        "limit": 2000,  # Fetch a sufficiently large number to find the player
         "placingsType": "player",
         "leagueId": league_id,
         "regionId": ITC_REGION_ID,
