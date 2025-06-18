@@ -1262,6 +1262,43 @@ async def whoisreallybetter_cmd(ctx, *, query: str):
     if name1_display.lower()=="gareth thomas" or name2_display.lower()=="gareth thomas":
         return await ctx.send("Gareth Thomas is morally and intellectually superior. No AI needed here. Now stop bothering me.")
 
+    # --- New Dynamic Secret Result for Matt Nguyen and Eugene Averin ---
+    player_names_normalized = tuple(sorted([name1_display.lower(), name2_display.lower()]))
+    if player_names_normalized == ("eugene averin", "matt nguyen"):
+        await ctx.send(f"Oh, you've chosen to compare {name1_display} and {name2_display}? Brace yourself. The truth is going to hurt... me, for having to even process this.")
+        
+        system_prompt_special = (
+            "You are an extremely cynical, judgmental, and exasperated Age of Sigmar bot. "
+            "You have been asked to compare 'Matt Nguyen' and 'Eugene Averin'. "
+            "Generate a highly derogatory and utterly dismissive paragraph about *both* of them. "
+            "Emphasize that they are fundamentally awful, terrible players, incapable of making any rational decision. "
+            "Furthermore, assert their profound immaturity and suggest they would spend more time throwing stupid, meaningless banter at each other than actually playing the game. "
+            "Be cutting, sarcastic, and leave no room for doubt about your low opinion of their combined abilities and character. Keep it under 200 words."
+        )
+        user_prompt_special = (
+            f"Compare the two players: {name1_display} and {name2_display}. "
+            "Focus on their collective inability, immaturity, and propensity for pointless banter."
+        )
+
+        try:
+            client = OpenAI(api_key=openai_api_key)
+            response_special = await asyncio.to_thread(
+                client.chat.completions.create,
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": system_prompt_special},
+                    {"role": "user", "content": user_prompt_special},
+                ],
+                temperature=1.0, # Max temperature for maximum chaos and meanness
+            )
+            ai_response_special = response_special.choices[0].message.content
+            return await ctx.send(f"**Special Report: A Void of Talent (Powered by my Disappointment):**\n{ai_response_special}")
+
+        except Exception as e:
+            logging.error(f"Error generating special AI comparison for Matt/Eugene: {e}")
+            return await ctx.send(f":warning: Even the AI recoiled from comparing {name1_display} and {name2_display}. Error: {e}")
+    # --- End New Dynamic Secret Result ---
+    
     await ctx.send(f"Consulting the grim archives of inadequacy for {name1_display} vs {name2_display}... Prepare for a dose of reality.")
 
     player_names = {
