@@ -26,6 +26,14 @@ BASE_EVENT_URL    = 'https://newprod-api.bestcoastpairings.com/v1/events'
 ITC_LEAGUE_ID     = 'vldWOTsjXggj'
 ITC_REGION_ID     = '61vXu5vli4'
 
+# League IDs for specific years (used by playerwr command)
+LEAGUE_YEARS = {
+    2025: 'vldWOTsjXggj',
+    2024: 'PHGDLQY41V',
+    2023: '2F20J0M34C',
+    2022: '23qDprPABN',
+}
+
 # Shared settings
 intents = discord.Intents.default()
 intents.message_content = True
@@ -1024,6 +1032,206 @@ async def stathammer_cmd(ctx, *, args: str):
     await ctx.send("\n".join(lines))
 
 
+# --- New Helper Function for Player Win Rates ---
+async def fetch_player_placings_for_year(
+    session: aiohttp.ClientSession, # Pass session to reuse it
+    player_name: str,
+    league_id: str,
+    year: int,
+    target_user_id: str = None
+):
+    """
+    Fetches the placings data for a specific player in a given league year,
+    prioritizing search by userId if provided, otherwise by name.
+
+    Args:
+        session (aiohttp.ClientSession): The client session to use for the HTTP request.
+        player_name (str): The full name of the player (e.g., "Gavin Grigar").
+        league_id (str): The league ID for the specific year.
+        year (int): The calendar year for which data is being fetched (for logging).
+        target_user_id (str, optional): The specific userId to search for.
+                                        If None, search by name. Defaults to None.
+
+    Returns:
+        dict: A dictionary containing 'wins', 'ties', 'losses', and 'userId' for the player,
+              or None if the player is not found or an error occurs.
+    """
+    PLACINGS_API_URL = f"{BASE_EVENT_URL.replace('/events','')}/placings"
+
+    headers = {
+        'Accept': 'application/json',
+        'x-api-key': BCP_API_KEY,
+        'client-id': CLIENT_ID,
+        'User-Agent': 'AoS-ITCCrank-Bot',
+    }
+    params = {
+        "limit": 500,  # Fetch a sufficiently large number to find the player
+        "placingsType": "player",
+        "leagueId": league_id,
+        "regionId": ITC_REGION_ID,
+        "sortAscending": "false"
+    }
+
+    if not BCP_API_KEY or not CLIENT_ID:
+        logging.error(f"Error for {year}: BCP_API_KEY or BCP_CLIENT_ID environment variables are not set.")
+        return None
+
+    search_criteria = f"ID: {target_user_id}" if target_user_id else f"Name: {player_name}"
+    logging.info(f"Fetching data for {player_name} in {year} ({search_criteria})...")
+
+    try:
+        async with session.get(
+            PLACINGS_API_URL,
+            params=params,
+            headers=headers
+        ) as resp:
+            resp.raise_for_status()
+            data = (await resp.json()).get("data", [])
+
+            # Filter logic: Prioritize userId if provided, else filter by name
+            for player_entry in data:
+                user_info = player_entry.get("user")
+                if user_info:
+                    current_entry_user_id = player_entry.get("userId")
+                    if target_user_id and current_entry_user_id == target_user_id:
+                        return {
+                            "wins": player_entry.get("wins", 0),
+                            "ties": player_entry.get("ties", 0),
+                            "losses": player_entry.get("losses", 0),
+                            "userId": current_entry_user_id
+                        }
+                    elif not target_user_id: # Only search by name if no target_user_id is given
+                        first_name = user_info.get("firstName", "")
+                        last_name = user_info.get("lastName", "")
+                        full_name = f"{first_name} {last_name}".strip().lower()
+                        if full_name == player_name.lower():
+                            return {
+                                "wins": player_entry.get("wins", 0),
+                                "ties": player_entry.get("ties", 0),
+                                "losses": player_entry.get("losses", 0),
+                                "userId": current_entry_user_id
+                            }
+            
+            # Player not found based on current criteria
+            if target_user_id:
+                logging.info(f"Player with ID '{target_user_id}' not found in {year}'s data (League ID: {league_id}).")
+            else:
+                logging.info(f"Player '{player_name}' not found in {year}'s data (League ID: {league_id}).")
+            return None
+    except aiohttp.ClientResponseError as e:
+        logging.error(f"HTTP Error for {year}: {e.status}, Reason: {e.message}, URL: {e.request_info.url}")
+        try:
+            error_text = await resp.text()
+            logging.error(f"Response body: {error_text}")
+        except Exception:
+            pass # Ignore error if response text can't be read
+        return None
+    except aiohttp.ClientError as e:
+        logging.error(f"Network error for {year}: {e}")
+        return None
+    except Exception as e:
+        logging.error(f"An unexpected error occurred for {year}: {e}")
+        return None
+
+# --- New !playerwr Command ---
+@aos_bot.command(name='playerwr', help='Show yearly and overall win rates for a player. Usage: !playerwr <first_name> <last_name>')
+async def playerwr_cmd(ctx, first_name: str, last_name: str):
+    player_to_find = f"{first_name.strip()} {last_name.strip()}"
+    full_player_name = player_to_find # Keep for display purposes
+    player_to_find = player_to_find.lower() # For internal comparison
+
+    await ctx.send(f"Fetching yearly win rates for **{full_player_name}**... This might take a moment.")
+
+    all_player_stats = {}
+    found_player_id = None
+    
+    # We will aggregate totals from valid years only
+    total_wins = 0
+    total_ties = 0
+    total_losses = 0
+
+    # Ensure we process 2025 first to get the userId, then sort other years descending
+    years_to_process = [2025] + sorted([year for year in LEAGUE_YEARS if year != 2025], reverse=True)
+
+    async with aiohttp.ClientSession() as session: # Use a single session for all requests
+        for year in years_to_process:
+            league_id = LEAGUE_YEARS[year]
+            
+            if year == 2025:
+                # For 2025, search by name and retrieve the userId
+                stats_with_id = await fetch_player_placings_for_year(
+                    session, player_to_find, league_id, year
+                )
+                if stats_with_id:
+                    # Store stats without userId, but keep userId for subsequent queries
+                    all_player_stats[year] = {k: v for k, v in stats_with_id.items() if k != 'userId'}
+                    found_player_id = stats_with_id.get("userId")
+                else:
+                    all_player_stats[year] = {"wins": "N/A", "ties": "N/A", "losses": "N/A"}
+            elif found_player_id:
+                # For subsequent years, use the found userId
+                stats_with_id = await fetch_player_placings_for_year(
+                    session, player_to_find, league_id, year, target_user_id=found_player_id
+                )
+                if stats_with_id:
+                    all_player_stats[year] = {k: v for k, v in stats_with_id.items() if k != 'userId'}
+                else:
+                    all_player_stats[year] = {"wins": "N/A", "ties": "N/A", "losses": "N/A"}
+            else:
+                # If player wasn't found in 2025, mark subsequent years as N/A
+                logging.info(f"Skipping {year} as player '{full_player_name}' (or their ID) was not found in 2025.")
+                all_player_stats[year] = {"wins": "N/A", "ties": "N/A", "losses": "N/A"}
+
+    # Calculate and add win rates and overall totals
+    # Aggregate totals from valid entries *after* all fetches are done
+    for year in sorted(all_player_stats.keys()): # Iterate through years to populate totals and win rates
+        stats = all_player_stats[year]
+        if isinstance(stats["wins"], int) and isinstance(stats["ties"], int) and isinstance(stats["losses"], int):
+            current_wins = stats["wins"]
+            current_ties = stats["ties"]
+            current_losses = stats["losses"]
+
+            total_games_year = current_wins + current_ties + current_losses
+            if total_games_year > 0:
+                win_rate_year = (current_wins / total_games_year) * 100
+                stats["win_rate"] = f"{win_rate_year:.2f}%"
+            else:
+                stats["win_rate"] = "N/A"
+            
+            # Only add to grand totals if the yearly stats were valid numbers
+            total_wins += current_wins
+            total_ties += current_ties
+            total_losses += current_losses
+        else:
+            stats["win_rate"] = "N/A" # Ensure win_rate is set even if stats are N/A
+
+    # Calculate overall win rate
+    overall_total_games = total_wins + total_ties + total_losses
+    if overall_total_games > 0:
+        overall_win_rate = (total_wins / overall_total_games) * 100
+        overall_win_rate_str = f"{overall_win_rate:.2f}%"
+    else:
+        overall_win_rate_str = "N/A"
+
+    # Prepare lines for Discord message
+    lines = []
+    lines.append("="*55)
+    lines.append(f"ITC Wins/Ties/Losses/Win Rate for {full_player_name}")
+    lines.append("="*55)
+    lines.append(f"{'Year':<8} | {'Wins':<6} | {'Ties':<6} | {'Losses':<6} | {'Win Rate':<10}")
+    lines.append("-" * 55)
+
+    for year in sorted(all_player_stats.keys(), reverse=True): # Print in descending year order
+        stats = all_player_stats[year]
+        lines.append(f"{year:<8} | {str(stats['wins']):<6} | {str(stats['ties']):<6} | {str(stats['losses']):<6} | {stats['win_rate']:<10}")
+
+    lines.append("-" * 55)
+    lines.append(f"{'Total':<8} | {total_wins:<6} | {total_ties:<6} | {total_losses:<6} | {overall_win_rate_str:<10}")
+    lines.append("="*55)
+
+    await send_lines(ctx, lines)
+
+
 aos_bot.remove_command('help')
 @aos_bot.command(name='help', help='List all AoS bot commands')
 async def help_cmd(ctx):
@@ -1038,6 +1246,7 @@ async def help_cmd(ctx):
              "!hof <faction_alias>",
              "!itcrank <player_name>",
              "!itcstandings <faction_alias>",
+             "!playerwr <player_name>",
              "!standings <event_search>",
              "!standingsfull <event_search>",
              "!pairings [round] <event_search>",
