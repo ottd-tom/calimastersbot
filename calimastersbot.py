@@ -32,6 +32,7 @@ LEAGUE_YEARS = {
     2024: 'PHGDLQY41V',
     2023: '2F20J0M34C',
     2022: '23qDprPABN',
+    2021: 'HyXfJt4g6P',
 }
 
 # Shared settings
