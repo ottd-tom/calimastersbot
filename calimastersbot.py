@@ -1260,9 +1260,9 @@ async def whoisreallybetter_cmd(ctx, *, query: str):
 
     # Special jokes (optional, can be removed if not desired for this command)
     if name1_display.lower()=="gareth thomas" or name2_display.lower()=="gareth thomas":
-        return await ctx.send("Gareth Thomas is morally and intellectually superior. No AI needed here.")
+        return await ctx.send("Gareth Thomas is morally and intellectually superior. No AI needed here. Now stop bothering me.")
 
-    await ctx.send(f"Consulting the ancient scrolls for {name1_display} vs {name2_display}... This might take a little longer as I analyze their full histories.")
+    await ctx.send(f"Consulting the grim archives of inadequacy for {name1_display} vs {name2_display}... Prepare for a dose of reality.")
 
     player_names = {
         'player1': name1_display,
@@ -1341,6 +1341,22 @@ async def whoisreallybetter_cmd(ctx, *, query: str):
                     "win_rate": overall_win_rate_player_str
                 }
             }
+    
+    # --- New Check for No Player Records ---
+    player1_data = all_players_yearly_stats['player1']['overall_stats']
+    player2_data = all_players_yearly_stats['player2']['overall_stats']
+
+    has_player1_data = isinstance(player1_data['wins'], int) and (player1_data['wins'] + player1_data['ties'] + player1_data['losses']) > 0
+    has_player2_data = isinstance(player2_data['wins'], int) and (player2_data['wins'] + player2_data['ties'] + player2_data['losses']) > 0
+
+    if not has_player1_data and not has_player2_data:
+        return await ctx.send(f":warning: Neither **{name1_display}** nor **{name2_display}** have any recorded ITC games across the years. What a waste of my time. Find some actual players to compare.")
+    elif not has_player1_data:
+        return await ctx.send(f":warning: **{name1_display}** has no recorded ITC games. There's nothing to compare. Are you even trying? {name2_display} wins by default, congratulations on being less invisible.")
+    elif not has_player2_data:
+        return await ctx.send(f":warning: **{name2_display}** has no recorded ITC games. Frankly, I expected more. {name1_display} wins by default, good job showing up, I guess.")
+    # --- End New Check ---
+
 
     # Prepare data for LLM
     llm_prompt_data = []
@@ -1361,7 +1377,7 @@ async def whoisreallybetter_cmd(ctx, *, query: str):
             player_info += f"Overall: No data recorded\n"
         llm_prompt_data.append(player_info)
 
-    # Construct LLM prompt
+    # Construct LLM prompt with a meaner tone
     system_prompt = (
         "You are a brutally honest, cynical, and condescending Age of Sigmar ITC bot. "
         "Your task is to analyze the provided player statistics and write a short, **cutting, and highly critical** paragraph "
@@ -1380,23 +1396,21 @@ async def whoisreallybetter_cmd(ctx, *, query: str):
 
     try:
         client = OpenAI(api_key=openai_api_key)
-        # Use asyncio.to_thread to run the synchronous OpenAI call in a separate thread
-        # so it doesn't block the Discord bot's async event loop.
-        response = await asyncio.to_thread(
+        response = await asyncio.to_thread( # Run in a separate thread to avoid blocking the event loop
             client.chat.completions.create,
-            model="gpt-4o-mini", # Using gpt-4o-mini for cost-effectiveness and speed for text generation
+            model="gpt-4o-mini", # Still using gpt-4o-mini, tone is mostly prompt-driven
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
-            temperature=0.7, # A bit of creativity for wittiness
+            temperature=0.9, # Increased temperature for more creative, aggressive language
         )
         ai_response = response.choices[0].message.content
-        await ctx.send(f"**The ITC Prophet's Judgment (Powered by AI):**\n{ai_response}")
+        await ctx.send(f"**The Unvarnished Truth (Brutality by AI):**\n{ai_response}")
 
     except Exception as e:
         logging.error(f"Error generating AI comparison: {e}")
-        await ctx.send(f":warning: An error occurred while consulting the AI: {e}")
+        await ctx.send(f":warning: An error occurred while consulting the AI: {e}. Perhaps the data was too depressing for it.")
 
 
 
