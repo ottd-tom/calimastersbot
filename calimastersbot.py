@@ -1229,6 +1229,7 @@ async def playerwr_cmd(ctx, first_name: str, last_name: str):
     lines.append("-" * 55)
     lines.append(f"{'Total':<8} | {total_wins:<6} | {total_ties:<6} | {total_losses:<6} | {overall_win_rate_str:<10}")
     lines.append("="*55)
+    lines.append("Donate at aos-events.com")
 
     await send_lines(ctx, lines)
 
