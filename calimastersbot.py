@@ -1647,12 +1647,12 @@ async def barkerbot_cmd(ctx):
     phrase = random.choice(barker_phrases)
     await ctx.send(phrase)
 
-carl_phrases = [
-    "I'm gunna nut"
+tomtom_phrases = [
+    "Tom's so smart"
 ]
-@aos_bot.command(name='carlbot', help='Get your AoS Questions answered')
-async def carlbot_cmd(ctx):
-    phrase = random.choice(carl_phrases)
+@aos_bot.command(name='tomtombot', help='Get your AoS Questions answered')
+async def tomtombot_cmd(ctx):
+    phrase = random.choice(tomtom_phrases)
     await ctx.send(phrase)
 
 
