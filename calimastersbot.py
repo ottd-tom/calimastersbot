@@ -1678,12 +1678,12 @@ def truncate_content(text: str, max_len: int = 1800) -> str:
             break
         out.append(line)
         count += ln
-    return "
-".join(out)
+    return "\n".join(out)
+
 
 @aos_bot.command(name='starspairings', help='Pair players between two teams: !starspairings <team1> <team2>')
 async def starspairings(ctx, team1: str, team2: str):
-    # Load teams
+    # Load teams JSON
     TEAMS_JSON = r"c:/temp/lists.json"
     teams_map = load_teams(TEAMS_JSON)
     t1 = teams_map.get(team1.lower())
@@ -1695,30 +1695,26 @@ async def starspairings(ctx, team1: str, team2: str):
     system_prompt = (
         f"You are the head coach of **{t1['team_name']}**. "
         f"Pair each of your players against one from **{t2['team_name']}**, "
-        "giving strategic reasoning based on faction and tactics. Output numbered list."
+        "giving strategic reasoning based on faction and tactics. Output a numbered list."
     )
 
     def fmt(team):
+        """Format a team's roster into lines of text."""
         lines = []
         for p in team['players']:
             fac = p.get('faction', 'Unknown')
             tacts = ', '.join(p.get('tactics', [])) or 'None'
             lines.append(f"- {p['name']} (Faction: {fac}; Tactics: {tacts})")
-        return "
-".join(lines)
+        return "\n".join(lines)
 
     user_content = (
-        f"Your Roster:
-{fmt(t1)}
-
-"
-        f"Opponents:
-{fmt(t2)}"
+        f"Your Roster:\n{fmt(t1)}\n\n"
+        f"Opponents:\n{fmt(t2)}"
     )
 
     # Truncate to avoid exceeding OpenAI's per-message 2000-char limit
     system_prompt = truncate_content(system_prompt, max_len=500)
-    user_content   = truncate_content(user_content,   max_len=1500)
+    user_content = truncate_content(user_content, max_len=1500)
 
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
