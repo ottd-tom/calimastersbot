@@ -9,6 +9,8 @@ import random
 import urllib.parse
 from wordfreq import top_n_list
 from datetime import datetime, timedelta
+import json
+from openai import OpenAI
 
 # Enable logging
 logging.basicConfig(level=logging.INFO)
@@ -1655,6 +1657,66 @@ async def tomtombot_cmd(ctx):
     phrase = random.choice(tomtom_phrases)
     await ctx.send(phrase)
 
+
+def load_teams(json_path: str) -> dict:
+    """Load teams data from JSON and return a mapping from lowercase team name to its data."""
+    with open(json_path, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+    return {team['team_name'].lower(): team for team in data.get('teams', [])}
+
+@aos_bot.command(
+    name='starspairings',
+    help='Pair players between two teams using AI coach logic: !starspairings <team1> <team2>'
+)
+async def starspairings(ctx, team1: str, team2: str):
+    # load your JSON dump
+    TEAMS_JSON = r"starslists.json"
+    teams_map = load_teams(TEAMS_JSON)
+    t1 = teams_map.get(team1.lower())
+    t2 = teams_map.get(team2.lower())
+    if not t1 or not t2:
+        return await ctx.send(f":x: Could not find teams `{team1}` or `{team2}`. Check spelling against lists.json.")
+
+    # coach‐mode prompt
+    system_prompt = (
+        f"You are the head coach of **{t1['team_name']}**. "
+        f"Pair each of your players versus one from **{t2['team_name']}**, "
+        "and give persuasive reasoning based on faction and battle tactics.\n\n"
+        "Output as:\n"
+        "1. Your_Player vs Opponent_Player: <reasoning>\n"
+    )
+
+    def fmt(team):
+        out = []
+        for p in team['players']:
+            fac = p.get('faction', 'Unknown')
+            tacts = ', '.join(p.get('tactics', [])) or 'None'
+            out.append(f"- {p['name']} (Faction: {fac}; Tactics: {tacts})")
+        return "\n".join(out)
+
+    user_content = (
+        f"Your Roster:\n{fmt(t1)}\n\n"
+        f"Opponents:\n{fmt(t2)}"
+    )
+
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        return await ctx.send(":warning: OPENAI_API_KEY not set.")
+    client = OpenAI(api_key=api_key)
+
+    try:
+        resp = await asyncio.to_thread(
+            client.chat.completions.create,
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user",   "content": user_content}
+            ],
+            temperature=0.7
+        )
+        await ctx.send(resp.choices[0].message.content)
+    except Exception as e:
+        await ctx.send(f":x: AI request failed: {e}")
 
 async def send_full_winrates(ctx, time_filter):
     data = await fetch_winrates(time_filter)
