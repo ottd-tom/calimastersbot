@@ -1664,58 +1664,80 @@ def load_teams(json_path: str) -> dict:
         data = json.load(f)
     return {team['team_name'].lower(): team for team in data.get('teams', [])}
 
-@aos_bot.command(name='starspairings', help='Pair players between two teams using AI coach logic: !starspairings <team1> <team2>')
+def truncate_content(text: str, max_len: int = 1800) -> str:
+    """Trim text at line boundaries to ensure length <= max_len, appending a truncation marker."""
+    if len(text) <= max_len:
+        return text
+    lines = text.splitlines()
+    out = []
+    count = 0
+    for line in lines:
+        ln = len(line) + 1
+        if count + ln > max_len:
+            out.append("...[truncated]")
+            break
+        out.append(line)
+        count += ln
+    return "
+".join(out)
+
+@aos_bot.command(name='starspairings', help='Pair players between two teams: !starspairings <team1> <team2>')
 async def starspairings(ctx, team1: str, team2: str):
     # Load teams
-    TEAMS_JSON = r"starslists.json"
+    TEAMS_JSON = r"c:/temp/lists.json"
     teams_map = load_teams(TEAMS_JSON)
     t1 = teams_map.get(team1.lower())
     t2 = teams_map.get(team2.lower())
     if not t1 or not t2:
-        return await ctx.send(f":x: Could not find teams `{team1}` or `{team2}`. Check spelling against lists.json.")
+        return await ctx.send(f":x: Could not find teams `{team1}` or `{team2}`. Check lists.json spelling.")
 
-    # Build prompt
+    # Build prompts
     system_prompt = (
         f"You are the head coach of **{t1['team_name']}**. "
-        f"Your goal is to pair each of your players against one player from **{t2['team_name']}**, "
-        "giving persuasive, strategic reasoning based on faction and battle tactics for each matchup. "
-        "Output in a list format, e.g.:\n"  
-        "1. Your_Player vs Opponent_Player: <reasoning>"  
+        f"Pair each of your players against one from **{t2['team_name']}**, "
+        "giving strategic reasoning based on faction and tactics. Output numbered list."
     )
-    # Construct user content with roster details
-    def format_roster(team):
+
+    def fmt(team):
         lines = []
         for p in team['players']:
             fac = p.get('faction', 'Unknown')
             tacts = ', '.join(p.get('tactics', [])) or 'None'
             lines.append(f"- {p['name']} (Faction: {fac}; Tactics: {tacts})")
-        return "\n".join(lines)
+        return "
+".join(lines)
 
     user_content = (
-        f"Team 1 Roster (Coach's team):\n{format_roster(t1)}\n\n"
-        f"Team 2 Roster (Opponents):\n{format_roster(t2)}"
+        f"Your Roster:
+{fmt(t1)}
+
+"
+        f"Opponents:
+{fmt(t2)}"
     )
 
-    # Call OpenAI
+    # Truncate to avoid exceeding OpenAI's per-message 2000-char limit
+    system_prompt = truncate_content(system_prompt, max_len=500)
+    user_content   = truncate_content(user_content,   max_len=1500)
+
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         return await ctx.send(":warning: OPENAI_API_KEY not set.")
     client = OpenAI(api_key=api_key)
+
     try:
         response = await asyncio.to_thread(
             client.chat.completions.create,
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_content}
+                {"role": "system",  "content": system_prompt},
+                {"role": "user",    "content": user_content}
             ],
             temperature=0.7
         )
-        reply = response.choices[0].message.content
-        await ctx.send(reply)
+        await ctx.send(response.choices[0].message.content)
     except Exception as e:
         await ctx.send(f":x: AI request failed: {e}")
-
 
 async def send_full_winrates(ctx, time_filter):
     data = await fetch_winrates(time_filter)
