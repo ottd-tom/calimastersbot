@@ -1731,7 +1731,8 @@ async def starspairings(ctx, team1: str, team2: str):
             ],
             temperature=0.7
         )
-        await ctx.send(response.choices[0].message.content)
+        reply = response.choices[0].message.content.splitlines()
+        await send_lines(ctx, reply)
     except Exception as e:
         await ctx.send(f":x: AI request failed: {e}")
 
