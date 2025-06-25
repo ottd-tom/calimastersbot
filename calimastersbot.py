@@ -1664,12 +1664,6 @@ def load_teams(json_path: str) -> dict:
         data = json.load(f)
     return {team['team_name'].lower(): team for team in data.get('teams', [])}
 
-ef load_teams(json_path: str) -> dict:
-    """Load teams data from JSON and return a mapping from lowercase team name to its data."""
-    with open(json_path, 'r', encoding='utf-8') as f:
-        data = json.load(f)
-    return {team['team_name'].lower(): team for team in data.get('teams', [])}
-
 @aos_bot.command(name='starspairings', help='Pair players between two teams using AI coach logic: !starspairings <team1> <team2>')
 async def starspairings(ctx, team1: str, team2: str):
     # Load teams
