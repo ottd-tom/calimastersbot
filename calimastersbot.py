@@ -1684,7 +1684,7 @@ def truncate_content(text: str, max_len: int = 1800) -> str:
 @aos_bot.command(name='starspairings', help='Pair players between two teams: !starspairings <team1> <team2>')
 async def starspairings(ctx, team1: str, team2: str):
     # Load teams JSON
-    TEAMS_JSON = r"c:/temp/lists.json"
+    TEAMS_JSON = r"starslists.json"
     teams_map = load_teams(TEAMS_JSON)
     t1 = teams_map.get(team1.lower())
     t2 = teams_map.get(team2.lower())
