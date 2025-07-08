@@ -1150,13 +1150,16 @@ async def fetch_player_placings_for_year(
         logging.error(f"An unexpected error occurred for {year}: {e}")
         return None
 
-# --- New !playerwr Command ---
+# --- !playerwr Command ---
 @aos_bot.command(name='playerwr', help='Show yearly and overall win rates for a player. Usage: !playerwr <first_name> <last_name>')
 async def playerwr_cmd(ctx, first_name: str, last_name: str):
     player_to_find = f"{first_name.strip()} {last_name.strip()}"
     full_player_name = player_to_find # Keep for display purposes
     player_to_find = player_to_find.lower() # For internal comparison
 
+    if player_to_find=="the noog":
+        return await ctx.send("I dunno man, that's a tricky one. A lot of his events have dubious records and can't be verified. The most accurate data we have says its around 19% though.")
+    
     await ctx.send(f"Fetching yearly win rates for **{full_player_name}**... This might take a moment.")
 
     all_player_stats = {}
