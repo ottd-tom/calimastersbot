@@ -11,6 +11,8 @@ from wordfreq import top_n_list
 from datetime import datetime, timedelta
 import json
 from openai import OpenAI
+import unicodedata
+import string
 
 # Enable logging
 logging.basicConfig(level=logging.INFO)
@@ -1035,7 +1037,19 @@ async def stathammer_cmd(ctx, *, args: str):
     await ctx.send("\n".join(lines))
 
 
-# --- New Helper Function for Player Win Rates ---
+# --- Helper Functions for Player Win Rates ---
+def normalize(name: str) -> str:
+    # 1) Decompose accents
+    name = unicodedata.normalize('NFKD', name)
+    # 2) Replace any kind of apostrophe/smart-quote with straight '
+    name = name.replace('’', "'").replace('‘', "'").replace('`', "'")
+    # 3) Lower-case and remove all punctuation
+    name = name.casefold()
+    name = name.translate(str.maketrans('', '', string.punctuation))
+    # 4) Collapse any extra whitespace
+    name = re.sub(r'\s+', ' ', name).strip()
+    return name
+
 async def fetch_player_placings_for_year(
     session: aiohttp.ClientSession, # Pass session to reuse it
     player_name: str,
@@ -1107,7 +1121,7 @@ async def fetch_player_placings_for_year(
                         first_name = user_info.get("firstName", "")
                         last_name = user_info.get("lastName", "")
                         full_name = f"{first_name} {last_name}".strip().lower()
-                        if full_name == player_name.lower():
+                        if normalize(full_name) == normalize(player_name.lower()):
                             return {
                                 "wins": player_entry.get("wins", 0),
                                 "ties": player_entry.get("ties", 0),
