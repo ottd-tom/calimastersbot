@@ -1700,61 +1700,6 @@ def truncate_content(text: str, max_len: int = 1800) -> str:
     return "\n".join(out)
 
 
-@aos_bot.command(name='starspairings', help='Pair players between two teams: !starspairings <team1> <team2>')
-async def starspairings(ctx, team1: str, team2: str):
-    # Load teams JSON
-    TEAMS_JSON = r"starslists.json"
-    teams_map = load_teams(TEAMS_JSON)
-    t1 = teams_map.get(team1.lower())
-    t2 = teams_map.get(team2.lower())
-    if not t1 or not t2:
-        return await ctx.send(f":x: Could not find teams `{team1}` or `{team2}`. Check lists.json spelling.")
-
-    # Build prompts
-    system_prompt = (
-        f"You are the head coach of **{t1['team_name']}**. "
-        f"Pair each of your players against one from **{t2['team_name']}**, "
-        "giving strategic reasoning based on faction and tactics. Output a numbered list."
-    )
-
-    def fmt(team):
-        """Format a team's roster into lines of text."""
-        lines = []
-        for p in team['players']:
-            fac = p.get('faction', 'Unknown')
-            tacts = ', '.join(p.get('tactics', [])) or 'None'
-            lines.append(f"- {p['name']} (Faction: {fac}; Tactics: {tacts})")
-        return "\n".join(lines)
-
-    user_content = (
-        f"Your Roster:\n{fmt(t1)}\n\n"
-        f"Opponents:\n{fmt(t2)}"
-    )
-
-    # Truncate to avoid exceeding OpenAI's per-message 2000-char limit
-    system_prompt = truncate_content(system_prompt, max_len=500)
-    user_content = truncate_content(user_content, max_len=1500)
-
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        return await ctx.send(":warning: OPENAI_API_KEY not set.")
-    client = OpenAI(api_key=api_key)
-
-    try:
-        response = await asyncio.to_thread(
-            client.chat.completions.create,
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system",  "content": system_prompt},
-                {"role": "user",    "content": user_content}
-            ],
-            temperature=0.7
-        )
-        reply = response.choices[0].message.content.splitlines()
-        await send_lines(ctx, reply)
-    except Exception as e:
-        await ctx.send(f":x: AI request failed: {e}")
-
 async def send_full_winrates(ctx, time_filter):
     data = await fetch_winrates(time_filter)
     items = [f for f in data.get('factions', []) if f['name'] not in EXCLUDE_FACTIONS]
@@ -1767,6 +1712,104 @@ async def send_full_winrates(ctx, time_filter):
         lines.append(f"{emoji} {f['name']}: {f['wins']}/{f['games']} ({pct:.2f}%)")
     lines += ['', 'Source: https://aos-events.com']
     await send_lines(ctx, lines)
+
+
+active_games = {}
+
+class GameSession:
+    def __init__(self, player1: discord.Member, player2: discord.Member, starting_chips: int = 100):
+        self.players = [player1, player2]
+        self.chips = {player1: starting_chips, player2: starting_chips}
+        self.turn = 0
+
+    def roll(self) -> int:
+        return random.randint(1, 6)
+
+    def bet(self, amount: int):
+        r1 = self.roll()
+        r2 = self.roll()
+        if r1 > r2:
+            winner = self.players[0]
+            loser = self.players[1]
+        elif r2 > r1:
+            winner = self.players[1]
+            loser = self.players[0]
+        else:
+            return r1, r2, None
+        self.chips[winner] += amount
+        self.chips[loser] -= amount
+        return r1, r2, winner
+
+    def is_over(self) -> bool:
+        return any(chips <= 0 for chips in self.chips.values())
+
+class BettingView(discord.ui.View):
+    def __init__(self, session: GameSession):
+        super().__init__(timeout=None)
+        self.session = session
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user != self.session.players[self.session.turn]:
+            await interaction.response.send_message("It's not your turn!", ephemeral=True)
+            return False
+        return True
+
+    @discord.ui.button(label="Bet 10", style=discord.ButtonStyle.primary, custom_id="bet_10")
+    async def bet_10(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await process_bet(interaction, self.session, 10)
+
+    @discord.ui.button(label="Bet 20", style=discord.ButtonStyle.primary, custom_id="bet_20")
+    async def bet_20(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await process_bet(interaction, self.session, 20)
+
+    @discord.ui.button(label="Status", style=discord.ButtonStyle.secondary, custom_id="status")
+    async def status(self, interaction: discord.Interaction, button: discord.ui.Button):
+        status = "\n".join(f"{p.display_name}: {c} chips" for p, c in self.session.chips.items())
+        await interaction.response.send_message(f"Current chip counts:\n{status}", ephemeral=True)
+
+async def process_bet(interaction: discord.Interaction, session: GameSession, amount: int):
+    r1, r2, winner = session.bet(amount)
+    content = f"{session.players[0].mention} rolled {r1}, {session.players[1].mention} rolled {r2}.\n"
+    if winner:
+        content += f"{winner.mention} wins {amount} chips!\n"
+    else:
+        content += "It's a tie—no chips exchanged.\n"
+    status = " | ".join(f"{p.display_name}: {session.chips[p]} chips" for p in session.players)
+    content += status
+    if session.is_over():
+        loser = next(p for p, c in session.chips.items() if c <= 0)
+        victor = next(p for p in session.players if p is not loser)
+        content += f"\nGame over! {victor.mention} has won all the chips! 🎉"
+        view = BettingView(session)
+        for child in view.children:
+            child.disabled = True
+        await interaction.response.edit_message(content=content, view=view)
+        del active_games[interaction.channel.id]
+    else:
+        session.turn ^= 1
+        content += f"\nIt is now {session.players[session.turn].mention}'s turn."
+        view = BettingView(session)
+        await interaction.response.edit_message(content=content, view=view)
+
+@aos_bot.command(name="startgame")
+async def startgame(ctx: commands.Context, opponent: discord.Member):
+    channel_id = ctx.channel.id
+    if channel_id in active_games:
+        await ctx.send("A game is already in progress in this channel!")
+        return
+    session = GameSession(ctx.author, opponent)
+    active_games[channel_id] = session
+    view = BettingView(session)
+    await ctx.send(f"Game started between {ctx.author.mention} and {opponent.mention}! Each has 100 chips. It's {ctx.author.mention}'s turn.", view=view)
+
+@aos_bot.command(name="gamestatus")
+async def gamestatus(ctx: commands.Context):
+    session = active_games.get(ctx.channel.id)
+    if not session:
+        await ctx.send("No game in progress in this channel.")
+        return
+    status = "\n".join(f"{p.display_name}: {c} chips" for p, c in session.chips.items())
+    await ctx.send(f"Current chip counts:\n{status}")
 
 
 async def send_single(ctx, key, time_filter):
