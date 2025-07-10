@@ -1313,34 +1313,40 @@ async def tombot_cmd(ctx, *, question: str):
         except FileNotFoundError:
             return await ctx.send("Sorry, I have no memories to share…")
 
-        img_bytes = img_path.read_bytes()
-        try:
-            vision_resp = await openai.ChatCompletion.acreate(
-                model="gpt-4o-mini",    # or try "gpt-4o" if that one is vision-enabled for you
-                messages=[
-                    {"role":"system","content":(
-                        "You are TomBot, a rude and sarcastic Discord bot. "
-                        "First, briefly describe what you see, then roast it."
-                    )},
-                    {"role":"user","content":"Here’s the memory—analyze then roast it!"}
-                ],
-                files=[{
-                    "name": img_path.name,
-                    "data": img_bytes,
-                    "mimetype": f"image/{img_path.suffix.lstrip('.')}"
-                }],
-                temperature=0.9,
-                max_tokens=100,
-            )
+       try:
+            with open(img_path, "rb") as img_file:
+                vision_resp = await openai.ChatCompletion.acreate(
+                    model="gpt-4o-mini",    # or whatever vision model you have
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": (
+                                "You are TomBot, a rude and sarcastic Discord bot. "
+                                "First, briefly describe what you see in this photo, "
+                                "then roast the scene in one or two punchy sentences."
+                            )
+                        },
+                        {
+                            "role": "user",
+                            "content": "Here’s the memory—analyze then roast it!"
+                        }
+                    ],
+                    files=[{
+                        "name": img_path.name,
+                        "data": img_file,   # <- pass the file handle, not bytes
+                        "mimetype": f"image/{img_path.suffix.lstrip('.')}"
+                    }],
+                    temperature=0.9,
+                    max_tokens=100,
+                )
             roast = vision_resp.choices[0].message.content
-    
         except Exception as e:
-            # Log to your Render console
-            print("🔥 Vision API error:", repr(e))
-            # Send the actual error back to Discord so you can see it
+            # log e to Render so you can inspect it
+            print("Vision API error:", repr(e))
             return await ctx.send(f"Vision API error: ```{e}```")
 
-        return await ctx.send(roast[:2000], file=discord.File(img_path))
+        # send the roast plus the actual image
+        return await ctx.send(roast.strip(), file=discord.File(img_path))
 
     # Regular OTTD Q&A flow
     topic, context = get_manual_context_gpt(question, openai)
