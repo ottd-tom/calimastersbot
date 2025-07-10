@@ -1297,7 +1297,7 @@ def pick_random_photo() -> Path:
         raise FileNotFoundError("No images in photos/")
     return random.choice(pics)
 
-@bot.command(name='tombot', help='Ask a question about the OTTD Summer Strike event pack.')
+@aos_bot.command(name='tombot', help='Ask a question about the OTTD Summer Strike event pack.')
 async def tombot_cmd(ctx, *, question: str):
     allowed_guild_ids = [1258302667403563118, 940470229732032583, 880232727159406642]
     if ctx.guild is None or ctx.guild.id not in allowed_guild_ids:
