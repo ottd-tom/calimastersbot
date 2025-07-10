@@ -18,27 +18,27 @@ TOPIC_FILES = {
     "food":    "context_food.txt",
     "other": "context_other.txt"
 }
-
 def detect_topic_gpt(question, openai_client=None):
     """
     Uses GPT to classify the question into a known topic category.
-    Requires an OpenAI client passed in.
+    Falls back to 'faq' if no client provided.
     """
     if openai_client is None:
-        return "faq"  # fallback in test mode
+        return "faq"
 
-    response = openai_client.chat.completions.create(
+    # Call the module-level ChatCompletion API
+    response = openai_client.ChatCompletion.create(
         model="gpt-4",
         temperature=0,
+        max_tokens=10,
         messages=[
             {"role": "system", "content": (
-                """You are a classifier for Summer Strike Age of Sigmar event questions. 
-    Your job is to assign one topic label to each question, based on the most relevant match. 
-    Choose only one topic from this list: ['scoring', 'venue', 'painting', 'schedule', 'lists', 'terrain', 'prizes', 'rules', 'faq', 'pairings', 'players', 'food'].
-    
-    Questions about who is likely to win or how strong a player is or who can play should be classified under 'players'. 
-    Questions about missions, plans or what we're playing should be classified under 'missions'.
-    Questions about food, the bar, alcohol, lunch, or what is available to eat or drink should be classified under 'food'."""
+                "You are a classifier for Summer Strike Age of Sigmar event questions. "
+                "Your job is to assign one topic label to each question, based on the most relevant match. "
+                "Choose only one topic from this list: ['scoring', 'venue', 'painting', 'schedule', 'lists', 'terrain', 'prizes', 'rules', 'faq', 'pairings', 'players', 'food']. "
+                "Questions about who is likely to win or how strong a player is or who can play should be classified under 'players'. "
+                "Questions about missions, plans or what we're playing should be classified under 'missions'. "
+                "Questions about food, the bar, alcohol, lunch, or what is available to eat or drink should be classified under 'food'."
             )},
             {"role": "user", "content": f"Question: {question}\nAnswer:"}
         ]
