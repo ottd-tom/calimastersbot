@@ -31,6 +31,7 @@ BASE_EVENT_URL    = 'https://newprod-api.bestcoastpairings.com/v1/events'
 ITC_LEAGUE_ID     = 'vldWOTsjXggj'
 ITC_REGION_ID     = '61vXu5vli4'
 PHOTO_DIR = Path(__file__).parent / "photos"
+PHOTO_DIR = Path(__file__).parent / "scionphotos"
 import openai
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
@@ -1383,6 +1384,12 @@ async def tombot_cmd(ctx, *, question: str):
 
 
 SCION_BASE_URL = "https://raw.githubusercontent.com/ottd-tom/calimastersbot/main/scionphotos"
+def pick_randomscion_photo() -> Path:
+    pics = [p for p in SCIONPHOTO_DIR.iterdir()
+            if p.is_file() and p.suffix.lower() in (".png", ".jpg", ".jpeg", ".gif")]
+    if not pics:
+        raise FileNotFoundError("No images in photos/")
+    return random.choice(pics)
 @aos_bot.command(name='scionbot', help='Ask a question about the OTTD Summer Strike event pack.')
 async def tombot_cmd(ctx, *, question: str):
     allowed_guild_ids = [1258302667403563118, 940470229732032583, 880232727159406642]
@@ -1395,7 +1402,7 @@ async def tombot_cmd(ctx, *, question: str):
     # Special case: share a memory
     if question.strip().lower() == "share a memory":
         try:
-            img_path = pick_random_photo()
+            img_path = pick_randomscion_photo()
         except FileNotFoundError:
             return await ctx.send("Sorry, I have no memories to share…")
 
