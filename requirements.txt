@@ -3,3 +3,5 @@ aiohttp
 wordfreq
 openai==0.27.8
 scikit-learn
+google-generativeai
+Pillow
