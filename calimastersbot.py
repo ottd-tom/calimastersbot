@@ -1316,21 +1316,13 @@ async def tombot_cmd(ctx, *, question: str):
         img_bytes = img_path.read_bytes()
         try:
             vision_resp = await openai.ChatCompletion.acreate(
-                model="gpt-4o-mini",
+                model="gpt-4o-mini",    # or try "gpt-4o" if that one is vision-enabled for you
                 messages=[
-                    {
-                        "role": "system",
-                        "content": (
-                            "You are TomBot, a rude and sarcastic Discord bot. "
-                            "First, *briefly* describe what you see in this photo "
-                            "(who, what, where). Then, *roast* the subjects or scene "
-                            "in one or two sharp sentences."
-                        )
-                    },
-                    {
-                        "role": "user",
-                        "content": "Here’s the memory—take a look and then roast it!"
-                    }
+                    {"role":"system","content":(
+                        "You are TomBot, a rude and sarcastic Discord bot. "
+                        "First, briefly describe what you see, then roast it."
+                    )},
+                    {"role":"user","content":"Here’s the memory—analyze then roast it!"}
                 ],
                 files=[{
                     "name": img_path.name,
@@ -1338,10 +1330,15 @@ async def tombot_cmd(ctx, *, question: str):
                     "mimetype": f"image/{img_path.suffix.lstrip('.')}"
                 }],
                 temperature=0.9,
+                max_tokens=100,
             )
             roast = vision_resp.choices[0].message.content
-        except Exception:
-            roast = "I tried to look at that photo, but it's too tragic even for me to process."
+    
+        except Exception as e:
+            # Log to your Render console
+            print("🔥 Vision API error:", repr(e))
+            # Send the actual error back to Discord so you can see it
+            return await ctx.send(f"Vision API error: ```{e}```")
 
         return await ctx.send(roast[:2000], file=discord.File(img_path))
 
