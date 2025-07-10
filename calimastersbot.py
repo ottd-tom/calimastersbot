@@ -1610,36 +1610,38 @@ async def maddybot_cmd(ctx):
     phrase = random.choice(maddy_phrases)
     await ctx.send(phrase)
 
-tomg_phrases = [
-    "lig",
-    "neat",
-    "nice",
-    "L",
-    "Holy",
-    "Based",
-    "Whoa",
-    "More rats",
-    "lig",
-    "neat",
-    "nice",
-    "L",
-    "Holy",
-    "Based",
-    "Whoa",
-    "Where's the nearest Olive Garden?",
-    "Miss home.  Where's nearest Panda Express?",
-    "Gotta go raid",
-    "Toms are so smart",
-    "fish",
-    "wow",
-    "sad",
-    "snap"
+
+# each entry is (phrase, weight)
+tombot_phrase_weights = [
+    ("More rats",                           1),
+    ("lig",                                  3),
+    ("neat",                                 3),
+    ("nice",                                 3),
+    ("L",                                    5),
+    ("Holy",                                 5),
+    ("Based",                                5),
+    ("Whoa",                                 5),
+    ("Where's the nearest Olive Garden?",    0.1),
+    ("Miss home.  Where's nearest Panda Express?", 0.01),
+    ("Gotta go raid",                        1),
+    ("Toms are so smart",                    1),
+    ("fish",                                 2),
+    ("wow",                                  5),
+    ("sad",                                  5),
+    ("snap",                                 5),
+    ("madge",                                3),
+    ("In Age of Sigmar, the principle “Know yourself and know your enemy” is as vital at the gaming table as it was on ancient battlefields. Before even rolling dice, a commander must understand the strengths and limitations of their chosen Host—whether the stoic resilience of the Stormcast Eternals, the untamed ferocity of the Kruleboyz, or the arcane versatility of the Idoneth Deepkin. Sun Tzu teaches that thorough preparation and self‐assessment secure victory: in Age of Sigmar terms, this means building a list that leverages synergies between units, abilities, and artifacts while anticipating the threats posed by common tournament archetypes. Likewise, scouting the opponent’s likely composition—and adapting your own to counter it—mirrors Sun Tzu’s emphasis on flexibility: be like water, fitting your deployment to the contours of the battlefield and the flow of the game. Victory arises not from brute force alone, but from the harmony of strategy, list construction, and foresight.
+Just as “All warfare is based on deception,” so too can an Age of Sigmar general employ feints, hidden reserves, and misdirection to unnerve an opponent. Concealing your true intent—perhaps by deploying a fast‐strike unit in a flank zone that ultimately proves a diversion—forces your adversary to commit resources reactively, leaving their main force vulnerable. Sun Tzu’s counsel to “appear weak when you are strong, and strong when you are weak” finds its echo in judicious use of command abilities and terrain: bait an enemy into committing to a tempting objective, then spring your counterstrike with battalions held in reserve. Finally, the art of timing—knowing when to seize momentum with a decisive charge and when to consolidate objectives—reflects Sun Tzu’s insistence on seizing “opportune moments” and turning them to advantage. In Age of Sigmar, as in ancient war, victory belongs not merely to the strongest host, but to the most cunning and adaptable mind.", 0.000001)
 ]
 
 @aos_bot.command(name='tomgbot', help='Get your AoS Questions answered')
 async def tomgbot_cmd(ctx):
-    phrase = random.choice(tomg_phrases)
-    await ctx.send(phrase)
+    # unzip into two parallel tuples
+    phrases, weights = zip(*tombot_phrase_weights)
+    # pick one according to its weight
+    choice = random.choices(phrases, weights=weights, k=1)[0]
+    await ctx.send(choice)
+
 
 gavin_phrases = [
     "Do it pussy"
