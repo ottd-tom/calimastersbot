@@ -1614,7 +1614,7 @@ async def scionbot_cmd(ctx, *, question: str):
             make_everyone_bald(
                 api_key='AIzaSyDxmZH-gHdW7kW9nxLaFlxIliqdh1oXU7s',
                 image_path=str(img_path),
-                style=style,
+               # style=style,
                 output_path=str(output_path)
             )
         except Exception as e:
