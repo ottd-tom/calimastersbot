@@ -1372,7 +1372,7 @@ async def tombot_cmd(ctx, *, question: str):
         reply = response.choices[0].message.content
         await ctx.send(reply[:2000])
     except Exception as e:
-        await ctx.send(f"Error: {e}"))
+        await ctx.send(f"Error: {e}")
 
 
 import random
