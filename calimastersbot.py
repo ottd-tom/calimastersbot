@@ -7,6 +7,7 @@ import logging
 import re
 import random
 import urllib.parse
+from urllib.parse import quote
 from wordfreq import top_n_list
 from datetime import datetime, timedelta
 import json
