@@ -1487,7 +1487,7 @@ async def scionbot_cmd(ctx, *, question: str):
 
     if question.strip().lower().startswith("weirdize a memory"):
         try:
-            img_path = pick_random_photo()
+            img_path = pick_randomscion_photo()
         except FileNotFoundError:
             return await ctx.send("Sorry, I have no memories to share…")
     
@@ -1507,8 +1507,8 @@ async def scionbot_cmd(ctx, *, question: str):
             return await ctx.send(f"Styling failed: {e}")
     
         return await ctx.send(
-            f"Here’s a {style}-style twist on a past memory:",
-            file=discord.File(output_path)
+            f"Here’s a {style}-style twist alongside the original memory:",
+            files=[discord.File(output_path), discord.File(img_path)]
         )
     
     return await ctx.send("No other commands yet")
