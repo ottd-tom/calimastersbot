@@ -1539,22 +1539,29 @@ async def tombot_cmd(ctx, *, question: str):
             img_bytes = img_file.read()
 
         # ask GPT-4 Vision (make sure your API & account have vision enabled!)
-        vision_resp = client.chat.completions.create(
-            model="gpt-4o-mini",
+        vision_resp = await openai.ChatCompletion.acreate(
+            model="gpt-4o-mini",    # your vision-enabled model
             messages=[
-                {"role":"system",
-                 "content":"You are TomBot… Roast this memory photo."},
-                {"role":"user",
-                 "content":"Here's the memory—roast it!"}
+                {
+                    "role": "system",
+                    "content": (
+                        "You are TomBot, a rude and sarcastic Discord bot. Roast this memory photo."
+                    )
+                },
+                {
+                    "role": "user",
+                    "content": "Here's the memory—roast it!"
+                }
             ],
-            attachments=[{
-                "filename": img_path.name,
-                "data": img_bytes,
-                "mimetype": f"image/{img_path.suffix.lstrip('.')}"
-            }],
+            files=[
+                {
+                    "name": img_path.name,
+                    "data": img_bytes,
+                    "mimetype": f"image/{img_path.suffix.lstrip('.')}"
+                }
+            ],
             temperature=0.8,
         )
-
         roast = vision_resp.choices[0].message.content
 
         # finally, send the roast + the image into Discord
