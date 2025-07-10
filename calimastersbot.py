@@ -14,6 +14,11 @@ import json
 import unicodedata
 import string
 from pathlib import Path
+from PIL import Image
+from io import BytesIO
+import google.generativeai as genai
+from google.generativeai.types import content_types
+from google.generativeai import types
 
 # Enable logging
 logging.basicConfig(level=logging.INFO)
