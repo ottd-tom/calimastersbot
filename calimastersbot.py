@@ -1290,14 +1290,15 @@ async def servers(ctx):
         lines.append(f"{idx}. {g.name} (ID: {g.id})")
     await ctx.send("```" + "\n".join(lines) + "```")
 
-RAW_BASE_URL = "https://raw.githubusercontent.com/ottd-tom/calimastersbot/main/photos"
+
 def pick_random_photo() -> Path:
     pics = [p for p in PHOTO_DIR.iterdir()
             if p.is_file() and p.suffix.lower() in (".png", ".jpg", ".jpeg", ".gif")]
     if not pics:
         raise FileNotFoundError("No images in photos/")
     return random.choice(pics)
-
+    
+RAW_BASE_URL = "https://raw.githubusercontent.com/ottd-tom/calimastersbot/main/photos"
 @aos_bot.command(name='tombot', help='Ask a question about the OTTD Summer Strike event pack.')
 async def tombot_cmd(ctx, *, question: str):
     allowed_guild_ids = [1258302667403563118, 940470229732032583, 880232727159406642]
@@ -1380,6 +1381,54 @@ async def tombot_cmd(ctx, *, question: str):
     except Exception as e:
         await ctx.send(f"Error: {e}")
 
+
+SCION_BASE_URL = "https://raw.githubusercontent.com/ottd-tom/calimastersbot/main/scionphotos"
+@aos_bot.command(name='scionbot', help='Ask a question about the OTTD Summer Strike event pack.')
+async def tombot_cmd(ctx, *, question: str):
+    allowed_guild_ids = [1258302667403563118, 940470229732032583, 880232727159406642]
+    if ctx.guild is None or ctx.guild.id not in allowed_guild_ids:
+        return await ctx.send(
+            "Do you really think this server is worthy of tombot? "
+            "You need to head to the OTTD discord: https://discord.com/invite/Fqeda4qVW8"
+        )
+
+    # Special case: share a memory
+    if question.strip().lower() == "share a memory":
+        try:
+            img_path = pick_random_photo()
+        except FileNotFoundError:
+            return await ctx.send("Sorry, I have no memories to share…")
+
+        # Build GitHub raw URL
+        filename = img_path.name
+        raw_url = f"{SCION_BASE_URL}/{quote(filename)}"
+
+        # Send to GPT-4 Vision via URL embed
+        try:
+            vision_resp = await openai.ChatCompletion.acreate(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": (
+                        "You are TomBot, a rude and sarcastic Discord bot. "
+                        "First, briefly describe what you see in this photo, then roast it in one or two punchy sentences."
+                    )},
+                    {"role": "user", "content": [
+                        {"type": "text",      "text": "Here’s a memory—take a look:"},
+                        {"type": "image_url", "image_url": {"url": raw_url}}
+                    ]}
+                ],
+                temperature=0.9,
+                max_tokens=100,
+            )
+            roast = vision_resp.choices[0].message.content.strip()
+        except Exception as e:
+            print("Vision API error:", repr(e))
+            roast = "I can’t even make fun of this—it's on a whole other level of bad."
+
+        # Send roast + attach local image
+        return await ctx.send(roast, file=discord.File(img_path))
+    #otherwise
+    return await ctx.send("No other commands yet")
 
 import random
 from discord.ext import commands
