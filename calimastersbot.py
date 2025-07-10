@@ -1772,28 +1772,39 @@ class BettingView(discord.ui.View):
         await interaction.response.send_message(f"Current chip counts:\n{status}", ephemeral=True)
 
 async def process_bet(interaction: discord.Interaction, session: GameSession, amount: int):
+    # Dramatic rolling animation
+    temp_view = BettingView(session)
+    for child in temp_view.children:
+        child.disabled = True
+    await interaction.response.edit_message(content="🎲 Rolling the dice...", view=temp_view)
+    await asyncio.sleep(2)
+
+    # Perform the bet
     r1, r2, winner = session.bet(amount)
     content = f"{session.players[0].mention} rolled {r1}, {session.players[1].mention} rolled {r2}.\n"
     if winner:
         content += f"{winner.mention} wins {amount} chips!\n"
     else:
         content += "It's a tie—no chips exchanged.\n"
+
     status = " | ".join(f"{p.display_name}: {session.chips[p]} chips" for p in session.players)
     content += status
+
+    # Check for game end
     if session.is_over():
         loser = next(p for p, c in session.chips.items() if c <= 0)
         victor = next(p for p in session.players if p is not loser)
         content += f"\nGame over! {victor.mention} has won all the chips! 🎉"
-        view = BettingView(session)
-        for child in view.children:
+        final_view = BettingView(session)
+        for child in final_view.children:
             child.disabled = True
-        await interaction.response.edit_message(content=content, view=view)
+        await interaction.followup.edit_message(interaction.message.id, content=content, view=final_view)
         del active_games[interaction.channel.id]
     else:
         session.turn ^= 1
         content += f"\nIt is now {session.players[session.turn].mention}'s turn."
-        view = BettingView(session)
-        await interaction.response.edit_message(content=content, view=view)
+        new_view = BettingView(session)
+        await interaction.followup.edit_message(interaction.message.id, content=content, view=new_view)
 
 @aos_bot.command(name="startgame")
 async def startgame(ctx: commands.Context, opponent: discord.Member):
