@@ -10,7 +10,6 @@ import urllib.parse
 from wordfreq import top_n_list
 from datetime import datetime, timedelta
 import json
-from openai import OpenAI
 import unicodedata
 import string
 from pathlib import Path
@@ -31,6 +30,8 @@ BASE_EVENT_URL    = 'https://newprod-api.bestcoastpairings.com/v1/events'
 ITC_LEAGUE_ID     = 'vldWOTsjXggj'
 ITC_REGION_ID     = '61vXu5vli4'
 PHOTO_DIR = Path(__file__).parent / "photos"
+import openai
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
 # League IDs for specific years (used by playerwr command)
 LEAGUE_YEARS = {
@@ -1514,68 +1515,54 @@ def pick_random_photo() -> Path:
         raise FileNotFoundError("No images in photos/")
     return random.choice(pics)
 
-import openai
-from tombot_context_manual import get_manual_context_gpt
-
-@aos_bot.command(name='tombot', help='Ask a question about the OTTD Summer Strike event pack.')
+@bot.command(name='tombot', help='Ask a question about the OTTD Summer Strike event pack.')
 async def tombot_cmd(ctx, *, question: str):
-    allowed_guild_ids = [1258302667403563118, 940470229732032583, 880232727159406642]  
+    allowed_guild_ids = [1258302667403563118, 940470229732032583, 880232727159406642]
     if ctx.guild is None or ctx.guild.id not in allowed_guild_ids:
-        await ctx.send("Do you really think this server is worthy of tombot? You need to head to the OTTD discord. https://discord.com/invite/Fqeda4qVW8")
-        return
-    
-    import os
-    from openai import OpenAI
-    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        return await ctx.send(
+            "Do you really think this server is worthy of tombot? "
+            "You need to head to the OTTD discord: https://discord.com/invite/Fqeda4qVW8"
+        )
+
+    # Special case: share a memory
     if question.strip().lower() == "share a memory":
-        # pick a photo
         try:
             img_path = pick_random_photo()
         except FileNotFoundError:
             return await ctx.send("Sorry, I have no memories to share…")
 
-        # read the image bytes
-        with open(img_path, "rb") as img_file:
-            img_bytes = img_file.read()
-
-        # ask GPT-4 Vision (make sure your API & account have vision enabled!)
-        vision_resp = await openai.ChatCompletion.acreate(
-            model="gpt-4o-mini",    # your vision-enabled model
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are TomBot, a rude and sarcastic Discord bot. Roast this memory photo."
-                    )
-                },
-                {
-                    "role": "user",
-                    "content": "Here's the memory—roast it!"
-                }
-            ],
-            files=[
-                {
+        img_bytes = img_path.read_bytes()
+        try:
+            vision_resp = await openai.ChatCompletion.acreate(
+                model="gpt-4o-mini",  # vision-enabled model
+                messages=[
+                    {"role": "system", "content": (
+                        "You are TomBot, a rude and sarcastic Discord bot. "
+                        "Roast the following memory photo."
+                    )},
+                    {"role": "user", "content": "Here's the memory—roast it!"}
+                ],
+                files=[{
                     "name": img_path.name,
                     "data": img_bytes,
                     "mimetype": f"image/{img_path.suffix.lstrip('.')}"
-                }
-            ],
-            temperature=0.8,
-        )
-        roast = vision_resp.choices[0].message.content
+                }],
+                temperature=0.8,
+            )
+            roast = vision_resp.choices[0].message.content
+        except Exception:
+            roast = "I tried to look at that photo, but it's too tragic even for me to process."
 
-        # finally, send the roast + the image into Discord
-        await ctx.send(roast[:2000], file=discord.File(img_path))
-        return
-    
-    topic, context = get_manual_context_gpt(question, client)
+        return await ctx.send(roast[:2000], file=discord.File(img_path))
+
+    # Regular OTTD Q&A flow
+    topic, context = get_manual_context_gpt(question, openai)
 
     if topic == "players":
         system_prompt = (
             "You are TomBot, a rude and sarcastic Discord bot for the 'Old Town Throwdown Summer Strike' event. "
             "You have access to past player stats. Use this info to make predictions, talk smack, and show off. "
-            "Be short, rude, and overly confident in your judgments. Here's what you know:\n\n"
-            + context
+            "Be short, rude, and overly confident in your judgments. Here's what you know:\n\n" + context
         )
     else:
         system_prompt = (
@@ -1585,10 +1572,6 @@ async def tombot_cmd(ctx, *, question: str):
             "Event info:\n\n" + context
         )
 
-
-    user_prompt = f"Question: {question}"
-
-
     user_prompt = (
         "Pretend you’re talking to someone who just walked up and asked a really obvious, annoying question about 'Old Town Throwdown: Summer Strike'. "
         "Your job is to give them the answer, but also roast them for wasting your time.\n\n"
@@ -1596,8 +1579,7 @@ async def tombot_cmd(ctx, *, question: str):
     )
 
     try:
-        response = client.chat.completions.create(
-            #model="gpt-3.5-turbo",
+        response = await openai.ChatCompletion.acreate(
             model="gpt-4",
             messages=[
                 {"role": "system", "content": system_prompt},
@@ -1608,7 +1590,7 @@ async def tombot_cmd(ctx, *, question: str):
         reply = response.choices[0].message.content
         await ctx.send(reply[:2000])
     except Exception as e:
-        await ctx.send(f"Error: {str(e)}")
+        await ctx.send(f"Error: {e}"))
 
 
 import random
