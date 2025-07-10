@@ -1312,8 +1312,7 @@ async def tombot_cmd(ctx, *, question: str):
             img_path = pick_random_photo()
         except FileNotFoundError:
             return await ctx.send("Sorry, I have no memories to share…")
-
-       try:
+        try:
             with open(img_path, "rb") as img_file:
                 vision_resp = await openai.ChatCompletion.acreate(
                     model="gpt-4o-mini",    # or whatever vision model you have
@@ -1344,9 +1343,9 @@ async def tombot_cmd(ctx, *, question: str):
             # log e to Render so you can inspect it
             print("Vision API error:", repr(e))
             return await ctx.send(f"Vision API error: ```{e}```")
-
-        # send the roast plus the actual image
-        return await ctx.send(roast.strip(), file=discord.File(img_path))
+        
+    # send the roast plus the actual image
+    return await ctx.send(roast.strip(), file=discord.File(img_path))
 
     # Regular OTTD Q&A flow
     topic, context = get_manual_context_gpt(question, openai)
