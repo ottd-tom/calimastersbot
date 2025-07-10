@@ -1298,7 +1298,46 @@ def pick_random_photo() -> Path:
     if not pics:
         raise FileNotFoundError("No images in photos/")
     return random.choice(pics)
-    
+
+def apply_gemini_style(api_key: str, image_path: str, style: str, output_path: str):
+    genai.configure(api_key=api_key)
+    model_name = "gemini-2.0-flash-preview-image-generation"
+    model = genai.GenerativeModel(model_name=model_name)
+
+    try:
+        img = Image.open(image_path)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Input image not found at: {image_path}")
+    except Exception as e:
+        raise Exception(f"Could not open image at {image_path}: {e}")
+
+    if img.mode != "RGB":
+        img = img.convert("RGB")
+
+    prompt = (
+        f"Take this exact image and transform its visual style into a {style}-style artwork. "
+        "Maintain the original composition, subjects, and details, only changing the artistic style. "
+        "Generate only the styled image."
+    )
+
+    response = model.generate_content(
+        [prompt, img],
+        generation_config={
+            "response_modalities": ["TEXT", "IMAGE"],
+            "temperature": 0.6
+        }
+    )
+
+    for candidate in response.candidates:
+        if candidate.content:
+            for part in candidate.content.parts:
+                if hasattr(part, "inline_data") and part.inline_data:
+                    if part.inline_data.mime_type.startswith("image/"):
+                        with open(output_path, 'wb') as f:
+                            f.write(part.inline_data.data)
+                        return
+    raise ValueError("Gemini API did not return a styled image.")
+
 RAW_BASE_URL = "https://raw.githubusercontent.com/ottd-tom/calimastersbot/main/photos"
 from tombot_context_manual import get_manual_context_gpt
 @aos_bot.command(name='tombot', help='Ask a question about the OTTD Summer Strike event pack.')
@@ -1397,7 +1436,7 @@ def pick_randomscion_photo() -> Path:
         raise FileNotFoundError("No images in photos/")
     return random.choice(pics)
 @aos_bot.command(name='scionbot', help='Ask a question about the OTTD Summer Strike event pack.')
-async def tombot_cmd(ctx, *, question: str):
+async def scionbot_cmd(ctx, *, question: str):
     allowed_guild_ids = [1258302667403563118, 940470229732032583, 880232727159406642]
     if ctx.guild is None or ctx.guild.id not in allowed_guild_ids:
         return await ctx.send(
@@ -1440,7 +1479,33 @@ async def tombot_cmd(ctx, *, question: str):
 
         # Send roast + attach local image
         return await ctx.send(roast, file=discord.File(img_path))
-    #otherwise
+
+   if question.strip().lower().startswith("weirdize a memory"):
+        try:
+            img_path = pick_random_photo()
+        except FileNotFoundError:
+            return await ctx.send("Sorry, I have no memories to share…")
+
+        styles = ["cartoon", "muppets", "anime", "simpsons"]
+        style = random.choice(styles)
+        output_path = PHOTO_DIR / f"styled_{style}_{img_path.name}"
+
+        try:
+            apply_gemini_style(
+                api_key='AIzaSyDxmZH-gHdW7kW9nxLaFlxIliqdh1oXU7s',
+                image_path=str(img_path),
+                style=style,
+                output_path=str(output_path)
+            )
+        except Exception as e:
+            print("Gemini styling error:", e)
+            return await ctx.send(f"Styling failed: {e}")
+
+        return await ctx.send(
+            f"Here’s a {style}-style twist on a past memory:",
+            file=discord.File(output_path)
+        )
+    
     return await ctx.send("No other commands yet")
 
 import random
