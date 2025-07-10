@@ -31,7 +31,7 @@ BASE_EVENT_URL    = 'https://newprod-api.bestcoastpairings.com/v1/events'
 ITC_LEAGUE_ID     = 'vldWOTsjXggj'
 ITC_REGION_ID     = '61vXu5vli4'
 PHOTO_DIR = Path(__file__).parent / "photos"
-PHOTO_DIR = Path(__file__).parent / "scionphotos"
+SCIONPHOTO_DIR = Path(__file__).parent / "scionphotos"
 import openai
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
