@@ -13,6 +13,7 @@ import json
 from openai import OpenAI
 import unicodedata
 import string
+from pathlib import Path
 
 # Enable logging
 logging.basicConfig(level=logging.INFO)
@@ -1505,6 +1506,13 @@ async def servers(ctx):
     await ctx.send("```" + "\n".join(lines) + "```")
 
 
+def pick_random_photo() -> Path:
+    pics = [p for p in PHOTO_DIR.iterdir()
+            if p.is_file() and p.suffix.lower() in (".png", ".jpg", ".jpeg", ".gif")]
+    if not pics:
+        raise FileNotFoundError("No images in photos/")
+    return random.choice(pics)
+
 import openai
 from tombot_context_manual import get_manual_context_gpt
 
@@ -1517,8 +1525,51 @@ async def tombot_cmd(ctx, *, question: str):
     
     import os
     from openai import OpenAI
-
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    if question.strip().lower() == "share a memory":
+        # pick a photo
+        try:
+            img_path = pick_random_photo()
+        except FileNotFoundError:
+            return await ctx.send("Sorry, I have no memories to share…")
+
+        # read the image bytes
+        with open(img_path, "rb") as img_file:
+            img_bytes = img_file.read()
+
+        # ask GPT-4 Vision (make sure your API & account have vision enabled!)
+        vision_resp = client.chat.completions.create(
+            model="gpt-4o-mini",            # or "gpt-4o" / "gpt-4-vision" as available
+            messages=[
+                {
+                  "role": "system",
+                  "content": (
+                    "You are TomBot, a rude and sarcastic Discord bot. "
+                    "The user wants you to roast and make a witty comment about their memory photo."
+                  )
+                },
+                {
+                  # here we attach the image
+                  "role": "user",
+                  "content": "Here's the memory image—what do you think of it? Roast away!"
+                }
+            ],
+            # attach file bytes; the exact key (“files” vs “attachments”) 
+            # depends on your openai-python version
+            files=[{
+              "name": img_path.name,
+              "data": img_bytes,
+              "mimetype": f"image/{img_path.suffix.lstrip('.')}"
+            }],
+            temperature=0.8,
+        )
+
+        roast = vision_resp.choices[0].message.content
+
+        # finally, send the roast + the image into Discord
+        await ctx.send(roast[:2000], file=discord.File(img_path))
+        return
+    
     topic, context = get_manual_context_gpt(question, client)
 
     if topic == "players":
@@ -1547,7 +1598,6 @@ async def tombot_cmd(ctx, *, question: str):
     )
 
     try:
-        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         response = client.chat.completions.create(
             #model="gpt-3.5-turbo",
             model="gpt-4",
