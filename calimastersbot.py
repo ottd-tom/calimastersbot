@@ -1305,7 +1305,22 @@ async def tombot_cmd(ctx, *, question: str):
             "Do you really think this server is worthy of tombot? "
             "You need to head to the OTTD discord: https://discord.com/invite/Fqeda4qVW8"
         )
-
+    import os
+    files = []
+    for p in PHOTO_DIR.iterdir():
+        try:
+            size = p.stat().st_size
+        except Exception as e:
+            size = f"<error: {e}>"
+        files.append(f"{p.name} ({size} bytes)")
+    await ctx.send(
+        "DEBUG:\n"
+        f"PHOTO_DIR = {PHOTO_DIR}\n"
+        f"Exists? {PHOTO_DIR.exists()}  IsDir? {PHOTO_DIR.is_dir()}\n"
+        "Contents:\n" + "\n".join(files)
+    )
+    # then immediately return so you don’t run the rest
+    return
     # Special case: share a memory
     if question.strip().lower() == "share a memory":
         try:
