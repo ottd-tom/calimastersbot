@@ -1316,20 +1316,28 @@ async def tombot_cmd(ctx, *, question: str):
         img_bytes = img_path.read_bytes()
         try:
             vision_resp = await openai.ChatCompletion.acreate(
-                model="gpt-4o-mini",  # vision-enabled model
+                model="gpt-4o-mini",
                 messages=[
-                    {"role": "system", "content": (
-                        "You are TomBot, a rude and sarcastic Discord bot. "
-                        "Roast the following memory photo."
-                    )},
-                    {"role": "user", "content": "Here's the memory—roast it!"}
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are TomBot, a rude and sarcastic Discord bot. "
+                            "First, *briefly* describe what you see in this photo "
+                            "(who, what, where). Then, *roast* the subjects or scene "
+                            "in one or two sharp sentences."
+                        )
+                    },
+                    {
+                        "role": "user",
+                        "content": "Here’s the memory—take a look and then roast it!"
+                    }
                 ],
                 files=[{
                     "name": img_path.name,
                     "data": img_bytes,
                     "mimetype": f"image/{img_path.suffix.lstrip('.')}"
                 }],
-                temperature=0.8,
+                temperature=0.9,
             )
             roast = vision_resp.choices[0].message.content
         except Exception:
