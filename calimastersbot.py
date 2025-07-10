@@ -1289,7 +1289,7 @@ async def servers(ctx):
         lines.append(f"{idx}. {g.name} (ID: {g.id})")
     await ctx.send("```" + "\n".join(lines) + "```")
 
-
+RAW_BASE_URL = "https://raw.githubusercontent.com/ottd-tom/calimastersbot/main/photos"
 def pick_random_photo() -> Path:
     pics = [p for p in PHOTO_DIR.iterdir()
             if p.is_file() and p.suffix.lower() in (".png", ".jpg", ".jpeg", ".gif")]
@@ -1312,40 +1312,35 @@ async def tombot_cmd(ctx, *, question: str):
             img_path = pick_random_photo()
         except FileNotFoundError:
             return await ctx.send("Sorry, I have no memories to share…")
+
+        # Build GitHub raw URL
+        filename = img_path.name
+        raw_url = f"{RAW_BASE_URL}/{quote(filename)}"
+
+        # Send to GPT-4 Vision via URL embed
         try:
-            with open(img_path, "rb") as img_file:
-                vision_resp = await openai.ChatCompletion.acreate(
-                    model="gpt-4o-mini",    # or whatever vision model you have
-                    messages=[
-                        {
-                            "role": "system",
-                            "content": (
-                                "You are TomBot, a rude and sarcastic Discord bot. "
-                                "First, briefly describe what you see in this photo, "
-                                "then roast the scene in one or two punchy sentences."
-                            )
-                        },
-                        {
-                            "role": "user",
-                            "content": "Here’s the memory—analyze then roast it!"
-                        }
-                    ],
-                    files=[{
-                        "name": img_path.name,
-                        "data": img_file,   # <- pass the file handle, not bytes
-                        "mimetype": f"image/{img_path.suffix.lstrip('.')}"
-                    }],
-                    temperature=0.9,
-                    max_tokens=100,
-                )
-            roast = vision_resp.choices[0].message.content
+            vision_resp = await openai.ChatCompletion.acreate(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": (
+                        "You are TomBot, a rude and sarcastic Discord bot. "
+                        "First, briefly describe what you see in this photo, then roast it in one or two punchy sentences."
+                    )},
+                    {"role": "user", "content": [
+                        {"type": "text",      "text": "Here’s a memory—take a look:"},
+                        {"type": "image_url", "image_url": {"url": raw_url}}
+                    ]}
+                ],
+                temperature=0.9,
+                max_tokens=100,
+            )
+            roast = vision_resp.choices[0].message.content.strip()
         except Exception as e:
-            # log e to Render so you can inspect it
             print("Vision API error:", repr(e))
-            return await ctx.send(f"Vision API error: ```{e}```")
-        
-    # send the roast plus the actual image
-    return await ctx.send(roast.strip(), file=discord.File(img_path))
+            roast = "I can’t even make fun of this—it's on a whole other level of bad."
+
+        # Send roast + attach local image
+        return await ctx.send(roast, file=discord.File(img_path))
 
     # Regular OTTD Q&A flow
     topic, context = get_manual_context_gpt(question, openai)
