@@ -1505,10 +1505,15 @@ async def tombot_cmd(ctx, *, question: str):
             print("Gemini styling error:", e)
             return await ctx.send(f"Styling failed: {e}")
     
-        return await ctx.send(
+        message = await ctx.send(
             f"Here’s a {style}-style twist alongside the original memory:",
             files=[discord.File(output_path), discord.File(img_path)]
         )
+        try:
+            os.remove(output_path)
+        except OSError:
+            pass
+        return message
     
     # Regular OTTD Q&A flow
     topic, context = get_manual_context_gpt(question, openai)
@@ -1611,20 +1616,55 @@ async def scionbot_cmd(ctx, *, question: str):
         output_path = PHOTO_DIR / f"styled_{style}_{img_path.name}"
     
         try:
-            make_everyone_bald(
+            apply_gemini_style(
                 api_key='AIzaSyDxmZH-gHdW7kW9nxLaFlxIliqdh1oXU7s',
                 image_path=str(img_path),
-               # style=style,
+                style=style,
                 output_path=str(output_path)
             )
         except Exception as e:
             print("Gemini styling error:", e)
             return await ctx.send(f"Styling failed: {e}")
     
-        return await ctx.send(
+        message = await ctx.send(
             f"Here’s a {style}-style twist alongside the original memory:",
             files=[discord.File(output_path), discord.File(img_path)]
         )
+        try:
+            os.remove(output_path)
+        except OSError:
+            pass
+        return message
+
+    if question.strip().lower().startswith("scionize"):
+        try:
+            img_path = pick_randomscion_photo()
+        except FileNotFoundError:
+            return await ctx.send("Sorry, I have no memories to share…")
+    
+        styles = ["cartoon", "muppets", "anime", "simpsons"]
+        style = random.choice(styles)
+        output_path = PHOTO_DIR / f"styled_{style}_{img_path.name}"
+    
+        try:
+            make_everyone_bald(
+                api_key='AIzaSyDxmZH-gHdW7kW9nxLaFlxIliqdh1oXU7s',
+                image_path=str(img_path),
+                output_path=str(output_path)
+            )
+        except Exception as e:
+            print("Gemini styling error:", e)
+            return await ctx.send(f"Styling failed: {e}")
+    
+        message = await ctx.send(
+            f"Fucking baldies:",
+            files=[discord.File(output_path), discord.File(img_path)]
+        )
+        try:
+            os.remove(output_path)
+        except OSError:
+            pass
+        return message
     
     return await ctx.send("No other commands yet")
 
