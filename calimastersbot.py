@@ -1753,7 +1753,12 @@ class BettingView(discord.ui.View):
         self.session = session
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.session.players[self.session.turn]:
+        # Only the two players can interact
+        if interaction.user not in self.session.players:
+            await interaction.response.send_message("Only current players can interact with the game.", ephemeral=True)
+            return False
+        # Only the current player can place bets
+        if interaction.data.get('custom_id', '').startswith("bet_") and interaction.user != self.session.players[self.session.turn]:
             await interaction.response.send_message("It's not your turn!", ephemeral=True)
             return False
         return True
@@ -1766,10 +1771,31 @@ class BettingView(discord.ui.View):
     async def bet_20(self, interaction: discord.Interaction, button: discord.ui.Button):
         await process_bet(interaction, self.session, 20)
 
+    @discord.ui.button(label="Bet 50", style=discord.ButtonStyle.primary, custom_id="bet_50")
+    async def bet_50(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await process_bet(interaction, self.session, 50)
+
+    @discord.ui.button(label="Bet 100", style=discord.ButtonStyle.primary, custom_id="bet_100")
+    async def bet_100(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await process_bet(interaction, self.session, 100)
+
     @discord.ui.button(label="Status", style=discord.ButtonStyle.secondary, custom_id="status")
     async def status(self, interaction: discord.Interaction, button: discord.ui.Button):
         status = "\n".join(f"{p.display_name}: {c} chips" for p, c in self.session.chips.items())
         await interaction.response.send_message(f"Current chip counts:\n{status}", ephemeral=True)
+
+    @discord.ui.button(label="Cancel Game", style=discord.ButtonStyle.danger, custom_id="cancel_game")
+    async def cancel_game(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # Allow either player to cancel
+        if interaction.user not in self.session.players:
+            await interaction.response.send_message("Only players can cancel the game.", ephemeral=True)
+            return
+        channel_id = interaction.channel.id
+        if channel_id in active_games:
+            del active_games[channel_id]
+        for child in self.children:
+            child.disabled = True
+        await interaction.response.edit_message(content="🚫 Game canceled. You can start a new game now.", view=self)
 
 async def process_bet(interaction: discord.Interaction, session: GameSession, amount: int):
     # Dramatic rolling animation
@@ -1790,7 +1816,6 @@ async def process_bet(interaction: discord.Interaction, session: GameSession, am
     status = " | ".join(f"{p.display_name}: {session.chips[p]} chips" for p in session.players)
     content += status
 
-    # Check for game end
     if session.is_over():
         loser = next(p for p, c in session.chips.items() if c <= 0)
         victor = next(p for p in session.players if p is not loser)
