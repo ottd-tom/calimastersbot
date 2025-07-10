@@ -1343,6 +1343,95 @@ def apply_gemini_style(api_key: str, image_path: str, style: str, output_path: s
                         return
     raise ValueError("Gemini API did not return a styled image.")
 
+def make_everyone_bald(api_key: str, image_path: str, output_path: str):
+    genai.configure(api_key=api_key)
+
+    model_name = "gemini-2.0-flash-preview-image-generation"
+    model = genai.GenerativeModel(model_name=model_name)
+
+    try:
+        img = Image.open(image_path)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Input image not found at: {image_path}")
+    except Exception as e:
+        raise Exception(f"Could not open image at {image_path}: {e}")
+
+    # Ensure the image is in RGB format for consistent processing
+    if img.mode != "RGB":
+        img = img.convert("RGB")
+
+    prompt = (
+        "Remove all hair from every person in the provided image to make them appear bald. "
+        "Ensure the changes look natural and realistic, and do not alter their facial features, "
+        "expressions, clothing, or the background. Generate only the modified image."
+    )
+
+    print(f"Sending image to Gemini model '{model_name}' to make everyone bald...")
+
+    try:
+        # Send the image and the detailed prompt to the model.
+        # Set temperature to a lower value (e.g., 0.5-0.7) to encourage less
+        # "creative" and more faithful modification of the input.
+        response = model.generate_content(
+            [prompt, img],
+            generation_config={
+                "response_modalities": ["TEXT", "IMAGE"],
+                "temperature": 0.7 # Adjust this value (0.0-1.0) for more/less creativity
+            }
+        )
+
+        image_data_found = False
+        for candidate in response.candidates:
+            if not candidate.content:
+                continue # Skip if candidate has no content
+
+            for part in candidate.content.parts:
+                if hasattr(part, "inline_data") and part.inline_data:
+                    # Check if the part contains image data
+                    if part.inline_data.mime_type.startswith("image/"):
+                        with open(output_path, 'wb') as f:
+                            f.write(part.inline_data.data)
+                        print(f"Bald-ified image successfully saved to: {output_path}")
+                        image_data_found = True
+                        return # Exit function once image is saved
+
+        if not image_data_found:
+            # If no image was found, check for any text response from the model
+            text_response_content = ""
+            if response.candidates:
+                for candidate in response.candidates:
+                    if candidate.content:
+                        for part in candidate.content.parts:
+                            if part.text:
+                                text_response_content += part.text + "\n"
+            
+            if text_response_content.strip():
+                raise ValueError(
+                    f"Gemini API did not return a modified image. It returned text:\n{text_response_content.strip()}\n"
+                    "This might indicate a content policy violation, a misunderstanding of the prompt, or an inability to perform the requested edit."
+                )
+            else:
+                raise ValueError(
+                    "No image or recognizable response returned from Gemini API. "
+                    "The API might have blocked the content, encountered an internal error, or the request was too ambiguous."
+                )
+
+    except genai.types.BlockedPromptException as e:
+        # This exception is raised if the prompt or the generated content is blocked by safety filters.
+        # The prompt_feedback attribute provides details on why it was blocked.
+        raise Exception(f"Request blocked by Gemini safety filters: {e.response.prompt_feedback}")
+    except Exception as e:
+        # Catch any other general exceptions during the API call
+        print(f"An unexpected error occurred during Gemini API call: {e}")
+        # Attempt to print any available text from the response for more context
+        if 'response' in locals() and hasattr(response, 'candidates') and response.candidates:
+            for candidate in response.candidates:
+                if hasattr(candidate, 'content') and candidate.content:
+                    for part in candidate.content.parts:
+                        if hasattr(part, 'text') and part.text:
+                            print(f"Additional API text feedback: {part.text}")
+        raise Exception(f"Failed to get image from Gemini API: {e}")
+
 RAW_BASE_URL = "https://raw.githubusercontent.com/ottd-tom/calimastersbot/main/photos"
 from tombot_context_manual import get_manual_context_gpt
 @aos_bot.command(name='tombot', help='Ask a question about the OTTD Summer Strike event pack.')
@@ -1522,7 +1611,7 @@ async def scionbot_cmd(ctx, *, question: str):
         output_path = PHOTO_DIR / f"styled_{style}_{img_path.name}"
     
         try:
-            apply_gemini_style(
+            make_everyone_bald(
                 api_key='AIzaSyDxmZH-gHdW7kW9nxLaFlxIliqdh1oXU7s',
                 image_path=str(img_path),
                 style=style,
