@@ -30,6 +30,7 @@ CLIENT_ID         = os.getenv("BCP_CLIENT_ID")
 BASE_EVENT_URL    = 'https://newprod-api.bestcoastpairings.com/v1/events'
 ITC_LEAGUE_ID     = 'vldWOTsjXggj'
 ITC_REGION_ID     = '61vXu5vli4'
+PHOTO_DIR = Path(__file__).parent / "photos"
 
 # League IDs for specific years (used by playerwr command)
 LEAGUE_YEARS = {
