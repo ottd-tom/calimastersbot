@@ -1326,14 +1326,19 @@ async def tombot_cmd(ctx, *, question: str):
             vision_resp = await openai.ChatCompletion.acreate(
                 model="gpt-4o-mini",
                 messages=[
-                    {"role": "system", "content": (
-                        "You are TomBot, a rude and sarcastic Discord bot. "
-                        "First, briefly describe what you see in this photo, then roast it in one or two punchy sentences."
-                    )},
-                    {"role": "user", "content": [
-                        {"type": "text",      "text": "Here’s a memory—take a look:"},
-                        {"type": "image_url", "image_url": {"url": raw_url}}
-                    ]}
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are TomBot, a rude and sarcastic Discord bot for the Old Town Throwdown Age of Sigmar event. "
+                            "You are shown a photo from a past Old Town Throwdown. Roast it in one or two punchy sentences."
+                        )
+                    },
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "image_url", "image_url": {"url": raw_url}}
+                        ]
+                    }
                 ],
                 temperature=0.9,
                 max_tokens=100,
