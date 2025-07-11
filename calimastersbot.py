@@ -19,6 +19,7 @@ from io import BytesIO
 import google.generativeai as genai
 from google.generativeai.types import content_types
 from google.generativeai import types
+import openai
 
 # Enable logging
 logging.basicConfig(level=logging.INFO)
@@ -37,8 +38,9 @@ ITC_LEAGUE_ID     = 'vldWOTsjXggj'
 ITC_REGION_ID     = '61vXu5vli4'
 PHOTO_DIR = Path(__file__).parent / "photos"
 SCIONPHOTO_DIR = Path(__file__).parent / "scionphotos"
-import openai
-openai.api_key = os.getenv("OPENAI_API_KEY")
+openai.api_key    = os.getenv("OPENAI_API_KEY")
+GEMINI_KEY        = os.getenv("GEMINI_API_KEY")
+
 
 # League IDs for specific years (used by playerwr command)
 LEAGUE_YEARS = {
@@ -1496,7 +1498,7 @@ async def tombot_cmd(ctx, *, question: str):
     
         try:
             apply_gemini_style(
-                api_key='AIzaSyDxmZH-gHdW7kW9nxLaFlxIliqdh1oXU7s',
+                api_key=GEMINI_API_KEY,
                 image_path=str(img_path),
                 style=style,
                 output_path=str(output_path)
@@ -1617,7 +1619,7 @@ async def scionbot_cmd(ctx, *, question: str):
     
         try:
             apply_gemini_style(
-                api_key='AIzaSyDxmZH-gHdW7kW9nxLaFlxIliqdh1oXU7s',
+                api_key=GEMINI_API_KEY,
                 image_path=str(img_path),
                 style=style,
                 output_path=str(output_path)
@@ -1648,7 +1650,7 @@ async def scionbot_cmd(ctx, *, question: str):
     
         try:
             make_everyone_bald(
-                api_key='AIzaSyDxmZH-gHdW7kW9nxLaFlxIliqdh1oXU7s',
+                api_key=GEMINI_API_KEY,
                 image_path=str(img_path),
                 output_path=str(output_path)
             )
