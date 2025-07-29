@@ -46,7 +46,10 @@ def detect_topic_gpt(question, openai_client=None):
     )
 
     answer = response.choices[0].message.content.strip().lower()
-    return answer if answer in TOPIC_FILES else "other"
+    topic  = answer.rstrip("s") if answer.rstrip("s") in TOPIC_FILES else answer
+    if topic not in TOPIC_FILES:
+        topic = "other"
+    return topic
 
 
 def get_manual_context_gpt(question, openai_client, context_dir="."):
