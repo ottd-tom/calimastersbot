@@ -43,7 +43,7 @@ for chunk in CHUNKS:
         tags.append("schedule")
     if any(k in lower for k in ["terrain", "table", "layout", "map", "deployment"]):
         tags.append("terrain")
-    if any(k in lower for k in ["list", "army list", "submit", "submission", "deadline"]):
+    if any(k in lower for k in ["list", "army list", "submit", "submission", "deadline", "lists"]):
         tags.append("lists")
     if any(k in lower for k in ["food", "lunch", "snack", "dinner", "meal", "break"]):
         tags.append("food")
