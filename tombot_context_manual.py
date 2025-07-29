@@ -39,6 +39,7 @@ def detect_topic_gpt(question, openai_client=None):
                 "Questions about who is likely to win or how strong a player is or who can play should be classified under 'players'. "
                 "Questions about missions, plans or what we're playing should be classified under 'missions'. "
                 "Questions about food, the bar, alcohol, lunch, or what is available to eat or drink should be classified under 'food'."
+                "Questions about army list **submission**, **deadlines**, or when to **turn in** your roster should be classified under 'lists'. "
             )},
             {"role": "user", "content": f"Question: {question}\nAnswer:"}
         ]
