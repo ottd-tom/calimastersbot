@@ -31,18 +31,35 @@ def detect_topic_gpt(question, openai_client=None):
         model="gpt-4",
         temperature=0,
         max_tokens=10,
-        messages=[
-            {"role": "system", "content": (
-                "You are a classifier for Summer Strike Age of Sigmar event questions. "
-                "Your job is to assign one topic label to each question, based on the most relevant match. "
-                "Choose only one topic from this list: ['scoring', 'venue', 'painting', 'schedule', 'lists', 'terrain', 'prizes', 'rules', 'faq', 'pairings', 'players', 'food']. "
-                "Questions about who is likely to win or how strong a player is or who can play should be classified under 'players'. "
-                "Questions about missions, plans or what we're playing should be classified under 'missions'. "
-                "Questions about food, the bar, alcohol, lunch, or what is available to eat or drink should be classified under 'food'."
-                "Questions about army list **submission**, **deadlines**, or when to **turn in** your roster should be classified under 'lists'. "
-            )},
-            {"role": "user", "content": f"Question: {question}\nAnswer:"}
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    "You are a classifier for Summer Strike Age of Sigmar event questions. "
+                    "Your job is to assign exactly one topic label to each question, choosing from:\n"
+                    "['scoring', 'venue', 'painting', 'schedule', 'lists', "
+                    "'terrain', 'prizes', 'rules', 'faq', 'pairings', 'players', 'food'].\n\n"
+                    "Rules:\n"
+                    "- Questions about who is likely to win or how strong a player is → 'players'.\n"
+                    "- Questions about missions, plans or what we're playing → 'missions'.\n"
+                    "- Questions about food, the bar, alcohol, lunch, or what is available to eat or drink → 'food'.\n"
+                    "- Questions about army list submission, deadlines, or when to turn in your roster → 'lists'.\n\n"
+                    "Examples:\n"
+                    "Q: When is list submission?           → lists\n"
+                    "Q: When are lists due?                → lists\n"
+                    "Q: What time do rounds start?         → schedule\n"
+                    "Q: Where is the event held?           → venue\n"
+                    "Q: Who is the favorite to win today?  → players\n"
+                    "Q: How do tiebreakers work?          → scoring\n\n"
+                    "Now classify this question (one label only):"
+                )
+            },
+            {
+                "role": "user",
+                "content": f"Question: {question}\nAnswer:"
+            }
         ]
+
     )
 
     answer = response.choices[0].message.content.strip().lower()
