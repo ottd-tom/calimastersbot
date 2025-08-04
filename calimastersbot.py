@@ -1754,15 +1754,6 @@ async def tomgbot_cmd(ctx):
     await ctx.send(choice)
 
 
-gavin_phrases = [
-    "Do it pussy"
-]
-
-@aos_bot.command(name='gavbot', help='Get your AoS Questions answered')
-async def gavbot_cmd(ctx):
-    phrase = random.choice(gavin_phrases)
-    await ctx.send(phrase)
-
 adam_phrases = [
     "I feel like one on one I outnumber most of the SoCal Warhammer scene"
 ]
@@ -1771,13 +1762,6 @@ async def adambot_cmd(ctx):
     phrase = random.choice(adam_phrases)
     await ctx.send(phrase)
 
-barker_phrases = [
-    "Why would you think there would be a bot for 'Barker'?  There's literally nobody in the AoS community of note with that name."
-]
-@aos_bot.command(name='barkerbot', help='Get your AoS Questions answered')
-async def barkerbot_cmd(ctx):
-    phrase = random.choice(barker_phrases)
-    await ctx.send(phrase)
 
 tomtom_phrases = [
     "Tom's so smart"
@@ -1785,6 +1769,14 @@ tomtom_phrases = [
 @aos_bot.command(name='tomtombot', help='Get your AoS Questions answered')
 async def tomtombot_cmd(ctx):
     phrase = random.choice(tomtom_phrases)
+    await ctx.send(phrase)
+
+tomtomtom_phrases = [
+    "Never met a Tom I like"
+]
+@aos_bot.command(name='tomtomtombot', help='Get your AoS Questions answered')
+async def tomtomtombot_cmd(ctx):
+    phrase = random.choice(tomtomtom_phrases)
     await ctx.send(phrase)
 
 
