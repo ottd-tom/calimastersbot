@@ -1834,140 +1834,6 @@ async def brianisinadequate(ctx):
 
 
 
-active_games = {}
-
-class GameSession:
-    def __init__(self, player1: discord.Member, player2: discord.Member, starting_chips: int = 100):
-        self.players = [player1, player2]
-        self.chips = {player1: starting_chips, player2: starting_chips}
-        self.turn = 0
-
-    def roll(self) -> int:
-        return random.randint(1, 6)
-
-    def bet(self, amount: int):
-        r1 = self.roll()
-        r2 = self.roll()
-        if r1 > r2:
-            winner = self.players[0]
-            loser = self.players[1]
-        elif r2 > r1:
-            winner = self.players[1]
-            loser = self.players[0]
-        else:
-            return r1, r2, None
-        self.chips[winner] += amount
-        self.chips[loser] -= amount
-        return r1, r2, winner
-
-    def is_over(self) -> bool:
-        return any(chips <= 0 for chips in self.chips.values())
-
-class BettingView(discord.ui.View):
-    def __init__(self, session: GameSession):
-        super().__init__(timeout=None)
-        self.session = session
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        # Only the two players can interact
-        if interaction.user not in self.session.players:
-            await interaction.response.send_message("Only current players can interact with the game.", ephemeral=True)
-            return False
-        # Only the current player can place bets
-        if interaction.data.get('custom_id', '').startswith("bet_") and interaction.user != self.session.players[self.session.turn]:
-            await interaction.response.send_message("It's not your turn!", ephemeral=True)
-            return False
-        return True
-
-    @discord.ui.button(label="Bet 10", style=discord.ButtonStyle.primary, custom_id="bet_10")
-    async def bet_10(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await process_bet(interaction, self.session, 10)
-
-    @discord.ui.button(label="Bet 20", style=discord.ButtonStyle.primary, custom_id="bet_20")
-    async def bet_20(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await process_bet(interaction, self.session, 20)
-
-    @discord.ui.button(label="Bet 50", style=discord.ButtonStyle.primary, custom_id="bet_50")
-    async def bet_50(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await process_bet(interaction, self.session, 50)
-
-    @discord.ui.button(label="Bet 100", style=discord.ButtonStyle.primary, custom_id="bet_100")
-    async def bet_100(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await process_bet(interaction, self.session, 100)
-
-    @discord.ui.button(label="Status", style=discord.ButtonStyle.secondary, custom_id="status")
-    async def status(self, interaction: discord.Interaction, button: discord.ui.Button):
-        status = "\n".join(f"{p.display_name}: {c} chips" for p, c in self.session.chips.items())
-        await interaction.response.send_message(f"Current chip counts:\n{status}", ephemeral=True)
-
-    @discord.ui.button(label="Cancel Game", style=discord.ButtonStyle.danger, custom_id="cancel_game")
-    async def cancel_game(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # Allow either player to cancel
-        if interaction.user not in self.session.players:
-            await interaction.response.send_message("Only players can cancel the game.", ephemeral=True)
-            return
-        channel_id = interaction.channel.id
-        if channel_id in active_games:
-            del active_games[channel_id]
-        for child in self.children:
-            child.disabled = True
-        await interaction.response.edit_message(content="🚫 Game canceled. You can start a new game now.", view=self)
-
-async def process_bet(interaction: discord.Interaction, session: GameSession, amount: int):
-    # Dramatic rolling animation
-    temp_view = BettingView(session)
-    for child in temp_view.children:
-        child.disabled = True
-    await interaction.response.edit_message(content="🎲 Rolling the dice...", view=temp_view)
-    await asyncio.sleep(2)
-
-    # Perform the bet
-    r1, r2, winner = session.bet(amount)
-    content = f"{session.players[0].mention} rolled {r1}, {session.players[1].mention} rolled {r2}.\n"
-    if winner:
-        content += f"{winner.mention} wins {amount} chips!\n"
-    else:
-        content += "It's a tie—no chips exchanged.\n"
-
-    status = " | ".join(f"{p.display_name}: {session.chips[p]} chips" for p in session.players)
-    content += status
-
-    if session.is_over():
-        loser = next(p for p, c in session.chips.items() if c <= 0)
-        victor = next(p for p in session.players if p is not loser)
-        content += f"\nGame over! {victor.mention} has won all the chips! 🎉"
-        final_view = BettingView(session)
-        for child in final_view.children:
-            child.disabled = True
-        await interaction.followup.edit_message(interaction.message.id, content=content, view=final_view)
-        del active_games[interaction.channel.id]
-    else:
-        session.turn ^= 1
-        content += f"\nIt is now {session.players[session.turn].mention}'s turn."
-        new_view = BettingView(session)
-        await interaction.followup.edit_message(interaction.message.id, content=content, view=new_view)
-
-@aos_bot.command(name="startgame")
-async def startgame(ctx: commands.Context, opponent: discord.Member):
-    channel_id = ctx.channel.id
-    if channel_id in active_games:
-        await ctx.send("A game is already in progress in this channel!")
-        return
-    session = GameSession(ctx.author, opponent)
-    active_games[channel_id] = session
-    view = BettingView(session)
-    await ctx.send(f"Game started between {ctx.author.mention} and {opponent.mention}! Each has 100 chips. It's {ctx.author.mention}'s turn.", view=view)
-
-@aos_bot.command(name="gamestatus")
-async def gamestatus(ctx: commands.Context):
-    session = active_games.get(ctx.channel.id)
-    if not session:
-        await ctx.send("No game in progress in this channel.")
-        return
-    status = "\n".join(f"{p.display_name}: {c} chips" for p, c in session.chips.items())
-    await ctx.send(f"Current chip counts:\n{status}")
-
-
 async def send_single(ctx, key, time_filter):
     name = ALIAS_MAP[key]
     data = await fetch_winrates(time_filter)
@@ -1991,15 +1857,50 @@ async def send_lines(ctx, lines):
     if buf:
         await ctx.send("```\n" + "\n".join(buf) + "\n```")
 
+async def start_with_retry(bot, token, name, first_delay=0):
+    # Optional initial stagger
+    if first_delay:
+        await asyncio.sleep(first_delay)
+
+    backoff = 5  # seconds
+    for attempt in range(1, 8):  # ~7 tries with exponential backoff
+        try:
+            logging.info(f"Starting {name} (attempt {attempt})")
+            await bot.start(token)  # this never returns unless it disconnects
+            return
+        except discord.HTTPException as e:
+            # 429 during static_login -> Cloudflare rate limit
+            if getattr(e, "status", None) == 429:
+                wait = min(120, backoff) + random.uniform(0, 2)
+                logging.warning(f"{name} hit 429 on login. Sleeping {wait:.1f}s before retry.")
+                await asyncio.sleep(wait)
+                backoff *= 2
+                continue
+            # Token bad or other hard failure: log and stop retrying this bot
+            logging.exception(f"{name} failed to start (status {getattr(e, 'status', 'n/a')}), not retrying.")
+            return
+        except Exception:
+            logging.exception(f"{name} unexpected error on start, not retrying.")
+            return
+
 async def main():
-    if not token_leaderboard or not token_aos:
-        print("Please set DISCORD_TOKEN and DISCORD_TOKEN_AOSEVENTS", file=sys.stderr)
+    if not token_leaderboard or not token_aos or not token_texas:
+        missing = [k for k, v in {
+            "DISCORD_TOKEN": token_leaderboard,
+            "DISCORD_TOKEN_AOSEVENTS": token_aos,
+            "TEXAS_DISCORD_BOT": token_texas,
+        }.items() if not v]
+        print(f"Missing tokens: {', '.join(missing)}", flush=True)
         return
-    await asyncio.gather(
-        leaderboard_bot.start(token_leaderboard),
-        aos_bot.start(token_aos),
-        tex_bot.start(token_texas)
-    )
+
+    # Stagger the three startups so they do not hit /users/@me simultaneously.
+    tasks = [
+        asyncio.create_task(start_with_retry(leaderboard_bot, token_leaderboard, "leaderboard_bot", first_delay=0)),
+        asyncio.create_task(start_with_retry(aos_bot,         token_aos,         "aos_bot",         first_delay=15)),
+        asyncio.create_task(start_with_retry(tex_bot,         token_texas,       "tex_bot",         first_delay=30)),
+    ]
+    # Wait forever (until tasks exit). If one fails, others keep running.
+    await asyncio.gather(*tasks, return_exceptions=True)
 
 if __name__ == '__main__':
     asyncio.run(main())
