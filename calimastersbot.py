@@ -1857,31 +1857,56 @@ async def send_lines(ctx, lines):
     if buf:
         await ctx.send("```\n" + "\n".join(buf) + "\n```")
 
-async def start_with_retry(bot, token, name, first_delay=0):
-    # Optional initial stagger
-    if first_delay:
-        await asyncio.sleep(first_delay)
+import asyncio, random, logging, discord
+
+login_lock = asyncio.Lock()
+
+async def run_bot(bot, token, name, initial_delay=0):
+    # small stagger before even trying
+    if initial_delay:
+        await asyncio.sleep(initial_delay)
 
     backoff = 5  # seconds
-    for attempt in range(1, 8):  # ~7 tries with exponential backoff
-        try:
-            logging.info(f"Starting {name} (attempt {attempt})")
-            await bot.start(token)  # this never returns unless it disconnects
-            return
-        except discord.HTTPException as e:
-            # 429 during static_login -> Cloudflare rate limit
-            if getattr(e, "status", None) == 429:
-                wait = min(120, backoff) + random.uniform(0, 2)
-                logging.warning(f"{name} hit 429 on login. Sleeping {wait:.1f}s before retry.")
-                await asyncio.sleep(wait)
-                backoff *= 2
-                continue
-            # Token bad or other hard failure: log and stop retrying this bot
-            logging.exception(f"{name} failed to start (status {getattr(e, 'status', 'n/a')}), not retrying.")
-            return
-        except Exception:
-            logging.exception(f"{name} unexpected error on start, not retrying.")
-            return
+    while True:
+        # Only one bot may perform HTTP login at a time.
+        async with login_lock:
+            try:
+                logging.info(f"{name}: logging in…")
+                await bot.login(token)  # does /users/@me via HTTP
+                logging.info(f"{name}: login OK")
+                break  # proceed to connect()
+            except discord.HTTPException as e:
+                if getattr(e, "status", None) == 429:
+                    wait = min(180, backoff) + random.uniform(0, 2)
+                    logging.warning(f"{name}: 429 during login. Sleeping {wait:.1f}s then retry.")
+                    # IMPORTANT: close any partially-open session before retrying
+                    try:
+                        await bot.close()
+                    except Exception:
+                        pass
+                    await asyncio.sleep(wait)
+                    backoff *= 2
+                    continue
+                logging.exception(f"{name}: login failed (status {getattr(e, 'status', 'n/a')}). Not retrying.")
+                try:
+                    await bot.close()
+                except Exception:
+                    pass
+                return
+            except Exception:
+                logging.exception(f"{name}: unexpected error during login. Not retrying.")
+                try:
+                    await bot.close()
+                except Exception:
+                    pass
+                return
+
+    # After a successful login, connect to the gateway. This never returns.
+    try:
+        await bot.connect(reconnect=True)
+    finally:
+        # Ensure clean shutdown if connect() ever exits
+        await bot.close()
 
 async def main():
     if not token_leaderboard or not token_aos or not token_texas:
@@ -1890,17 +1915,16 @@ async def main():
             "DISCORD_TOKEN_AOSEVENTS": token_aos,
             "TEXAS_DISCORD_BOT": token_texas,
         }.items() if not v]
-        print(f"Missing tokens: {', '.join(missing)}", flush=True)
+        print(f"Missing tokens: {', '.join(missing)}")
         return
 
-    # Stagger the three startups so they do not hit /users/@me simultaneously.
     tasks = [
-        asyncio.create_task(start_with_retry(leaderboard_bot, token_leaderboard, "leaderboard_bot", first_delay=0)),
-        asyncio.create_task(start_with_retry(aos_bot,         token_aos,         "aos_bot",         first_delay=15)),
-        asyncio.create_task(start_with_retry(tex_bot,         token_texas,       "tex_bot",         first_delay=30)),
+        asyncio.create_task(run_bot(leaderboard_bot, token_leaderboard, "leaderboard_bot", initial_delay=0)),
+        asyncio.create_task(run_bot(aos_bot,         token_aos,         "aos_bot",         initial_delay=12)),
+        asyncio.create_task(run_bot(tex_bot,         token_texas,       "tex_bot",         initial_delay=24)),
     ]
-    # Wait forever (until tasks exit). If one fails, others keep running.
     await asyncio.gather(*tasks, return_exceptions=True)
+
 
 if __name__ == '__main__':
     asyncio.run(main())
