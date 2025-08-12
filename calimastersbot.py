@@ -1818,13 +1818,13 @@ async def send_full_winrates(ctx, time_filter):
 
 
 
-@aos_bot.command(name='brianisinadequate', help='Show the current Cali Masters top 8')
+@aos_bot.command(name='brianisinadequate', help='Show the current Cali Masters top 16')
 async def brianisinadequate(ctx):
     data = await fetch_json(CALI_URL)
-    top = data[:8]
+    top = data[:16]
     if not top:
         return await ctx.send("No data available.")
-    lines = ["**🏆 Cali Masters Top 8 🏆**"]
+    lines = ["**🏆 Cali Masters Top 16 🏆**"]
     for i, rec in enumerate(top, 1):
         name = f"{rec['first_name']} {rec['last_name']}"
         lines.append(f"{i}. **{name}** — {rec['top4_sum']} pts")
