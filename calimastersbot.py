@@ -1171,6 +1171,11 @@ async def playerwr_cmd(ctx, first_name: str, last_name: str):
 
     if player_to_find=="the noog":
         return await ctx.send("I dunno man, that's a tricky one. A lot of his events have dubious records and can't be verified. The most accurate data we have says its around 19% though.")
+    elif player_to_find=="gareth thomas":
+        return await ctx.send("I dunno man, that's a tricky one. Genius of that level is hard to quantify.  Must be like over 90% though.")
+    elif player_to_find=="gareth thomasx":
+        player_to_find = "gareth thomas"
+        
     
     await ctx.send(f"Fetching yearly win rates for **{full_player_name}**... This might take a moment.")
 
