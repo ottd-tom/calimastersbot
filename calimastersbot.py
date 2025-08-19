@@ -1989,11 +1989,8 @@ async def generateteam_cmd(ctx, days: int = 30):
 
     for idx, item in enumerate(team, start=1):
         faction = item.get("faction", "Unknown")
-        rec     = item.get("record", "4-1")
-        ev      = item.get("event_name", "Unknown Event")
-        date_s  = str(item.get("event_date", ""))
-        player  = item.get("player_name", "Unknown Player")
-        title   = f"{idx}. {faction} — {player} — {rec} at {ev} ({date_s})"
+        rec     = item.get("record", "Unknown")
+        title   = f"{idx}. {faction} - {rec}"
         await send_code_block(ctx, title, item.get("list_text", "(no list text)"))
 
     await ctx.send("Done. :crossed_swords:")
