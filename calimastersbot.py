@@ -9,7 +9,7 @@ import random
 import urllib.parse
 from urllib.parse import quote
 from wordfreq import top_n_list
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 import json
 import unicodedata
 import string
@@ -20,6 +20,8 @@ import google.generativeai as genai
 from google.generativeai.types import content_types
 from google.generativeai import types
 import openai
+import asyncpg
+
 
 # Enable logging
 logging.basicConfig(level=logging.INFO)
@@ -1837,6 +1839,164 @@ async def brianisinadequate(ctx):
     lines.append("Full table: https://aos-events.com/calimasters")
     await ctx.send("\n".join(lines))
 
+
+
+DB_POOL = None
+
+async def get_db_pool():
+    """
+    Lazily create a global asyncpg pool using AOS_EVENTS_DB_URL (or DATABASE_URL) env var.
+    """
+    global DB_POOL
+    if DB_POOL is None:
+        dsn = os.getenv("AOS_EVENTS_DB_URL") or os.getenv("DATABASE_URL")
+        if not dsn:
+            raise RuntimeError("Set AOS_EVENTS_DB_URL or DATABASE_URL for Postgres connection")
+        DB_POOL = await asyncpg.create_pool(dsn, min_size=1, max_size=3)
+    return DB_POOL
+
+async def fetch_recent_41_50_lists(days: int = 30) -> list[dict]:
+    """
+    Return dicts with: list_text, faction, event_name, event_date, player_name, record (5-0/4-1)
+    for 5-round events since today - days.
+    """
+    cutoff = (datetime.utcnow().date() - timedelta(days=days))
+    sql = """
+    WITH five_round_events AS (
+        SELECT id, name, event_date
+        FROM events
+        WHERE rounds = 5
+          AND event_date >= $1::date
+    ),
+    all_results AS (
+        SELECT p.event_id,
+               p.player1_user_id AS pid,
+               p.player1_result  AS result
+          FROM pairings p
+          JOIN five_round_events e ON e.id = p.event_id
+        UNION ALL
+        SELECT p.event_id,
+               p.player2_user_id AS pid,
+               p.player2_result  AS result
+          FROM pairings p
+          JOIN five_round_events e ON e.id = p.event_id
+    ),
+    agg AS (
+        SELECT event_id,
+               pid,
+               SUM(CASE WHEN result = 'Win'  THEN 1 ELSE 0 END) AS wins,
+               SUM(CASE WHEN result = 'Loss' THEN 1 ELSE 0 END) AS losses,
+               SUM(CASE WHEN result = 'Draw' THEN 1 ELSE 0 END) AS draws
+          FROM all_results
+         GROUP BY event_id, pid
+    ),
+    qualified AS (
+        SELECT a.event_id, a.pid, a.wins, a.losses, a.draws,
+               CASE
+                 WHEN a.wins = 5 THEN '5-0'
+                 WHEN a.wins = 4 AND a.losses = 1 AND a.draws = 0 THEN '4-1'
+               END AS record
+          FROM agg a
+         WHERE a.wins = 5
+            OR (a.wins = 4 AND a.losses = 1 AND a.draws = 0)
+    )
+    SELECT q.event_id,
+           e.name                       AS event_name,
+           e.event_date::date           AS event_date,
+           q.pid                        AS player_id,
+           q.wins, q.losses, q.draws,
+           q.record,
+           pl.list_text,
+           pl.faction,
+           pl.player_name
+      FROM qualified q
+      JOIN five_round_events e
+        ON e.id = q.event_id
+      JOIN player_lists pl
+        ON pl.event_id = q.event_id
+       AND pl.player_id = q.pid
+     WHERE COALESCE(pl.list_text, '') <> ''
+    """
+    pool = await get_db_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(sql, cutoff)
+    # convert to plain dicts
+    out = []
+    for r in rows:
+        out.append({
+            "event_id":    r["event_id"],
+            "event_name":  r["event_name"],
+            "event_date":  r["event_date"].isoformat() if isinstance(r["event_date"], (date,)) else str(r["event_date"]),
+            "player_id":   r["player_id"],
+            "wins":        r["wins"],
+            "losses":      r["losses"],
+            "draws":       r["draws"],
+            "record":      r["record"],
+            "list_text":   r["list_text"],
+            "faction":     r["faction"] or "Unknown",
+            "player_name": r["player_name"] or "Unknown",
+        })
+    return out
+
+def _pick_team_no_dupe_factions(candidates: list[dict], team_size: int = 8) -> list[dict]:
+    """
+    Randomly pick up to team_size lists, ensuring factions are unique.
+    """
+    pool = candidates[:]
+    random.shuffle(pool)
+    seen, team = set(), []
+    for item in pool:
+        fac = (item.get("faction") or "").strip()
+        if not fac or fac in seen:
+            continue
+        if not (item.get("list_text") or "").strip():
+            continue
+        seen.add(fac)
+        team.append(item)
+        if len(team) >= team_size:
+            break
+    return team
+
+async def send_code_block(ctx, title: str, body: str):
+    trimmed = truncate_content(body, max_len=1850)
+    await ctx.send(f"**{title}**\n```{trimmed}```")
+
+
+@aos_bot.command(
+    name='generateteam',
+    help='Generate 8 recent high-performing lists (5-round events, 4-1/5-0), no duplicate factions. Usage: !generateteam [days]'
+)
+async def generateteam_cmd(ctx, days: int = 30):
+    if days < 1 or days > 120:
+        return await ctx.send(":warning: Days must be between 1 and 120.")
+    await ctx.send(f"Finding 5-round events in the last **{days}** days and grabbing **5-0 / 4-1** lists…")
+
+    try:
+        candidates = await fetch_recent_41_50_lists(days=days)
+    except Exception as e:
+        logging.exception("Error while fetching team candidates")
+        return await ctx.send(f":x: DB error: {e}")
+
+    if not candidates:
+        return await ctx.send(":warning: No qualifying lists found in that window.")
+
+    team = _pick_team_no_dupe_factions(candidates, team_size=8)
+    if not team:
+        return await ctx.send(":warning: Couldn’t assemble a team with unique factions from the results.")
+
+    if len(team) < 8:
+        await ctx.send(f":warning: Only found **{len(team)}** unique factions. Showing what I’ve got.")
+
+    for idx, item in enumerate(team, start=1):
+        faction = item.get("faction", "Unknown")
+        rec     = item.get("record", "4-1")
+        ev      = item.get("event_name", "Unknown Event")
+        date_s  = str(item.get("event_date", ""))
+        player  = item.get("player_name", "Unknown Player")
+        title   = f"{idx}. {faction} — {player} — {rec} at {ev} ({date_s})"
+        await send_code_block(ctx, title, item.get("list_text", "(no list text)"))
+
+    await ctx.send("Done. :crossed_swords:")
 
 
 async def send_single(ctx, key, time_filter):
