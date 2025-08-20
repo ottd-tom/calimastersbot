@@ -1787,6 +1787,74 @@ async def tomtomtombot_cmd(ctx):
     await ctx.send(phrase)
 
 
+@aos_bot.command(
+    name='noogbot',
+    help='Repeat the previous message, but rephrased in a dumb way that often misses the point.'
+)
+async def noogbot_cmd(ctx):
+    try:
+        # Pull the two most recent messages in this channel: [0] is the command, [1] is the one above it
+        msgs = [m async for m in ctx.channel.history(limit=2)]
+        if len(msgs) < 2:
+            return await ctx.send(":warning: I cannot see a previous message here.")
+
+        prev = msgs[1]
+
+        # Prefer the text content; if empty, try a small text attachment
+        prev_text = (prev.content or "").strip()
+
+        # Optionally try to read a small text attachment if no content
+        if not prev_text and prev.attachments:
+            for att in prev.attachments:
+                if (att.size or 0) <= 200_000 and att.content_type and "text" in att.content_type:
+                    try:
+                        prev_text = (await att.read()).decode("utf-8", errors="replace")
+                        prev_text = prev_text[:4000]  # keep it reasonable
+                        break
+                    except Exception:
+                        pass
+
+        if not prev_text:
+            return await ctx.send(":warning: The previous message had no readable text.")
+
+        # Call OpenAI to "dumbly rephrase" the text
+        # Uses your existing OPENAI_API_KEY setup
+        system_prompt = (
+            "You are NoogBot. You repeat what someone else said, but in a dumber way, "
+            "often missing the point. Keep it short, a bit confused, and kind of wrong. "
+            "Do not add explanations about what you are doing. Use plain ASCII only."
+        )
+
+        user_prompt = (
+            "Rephrase this so it sounds dumber and slightly off the point. Keep it brief.\n\n"
+            f"TEXT:\n{prev_text}"
+        )
+
+        try:
+            resp = await openai.ChatCompletion.acreate(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                temperature=0.9,
+                max_tokens=200,
+            )
+            reply = resp.choices[0].message.content.strip()
+        except Exception as e:
+            return await ctx.send(f":x: OpenAI error: {e}")
+
+        # Reuse your truncation helper to be safe for Discord limits
+        out = truncate_content(reply, max_len=1900)
+        await ctx.send(out)
+
+    except Exception as e:
+        await ctx.send(f":x: Error: {e}")
+
+
+
+
+
 def load_teams(json_path: str) -> dict:
     """Load teams data from JSON and return a mapping from lowercase team name to its data."""
     with open(json_path, 'r', encoding='utf-8') as f:
