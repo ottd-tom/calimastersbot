@@ -1787,44 +1787,56 @@ async def tomtomtombot_cmd(ctx):
     await ctx.send(phrase)
 
 
+async def _get_target_message(ctx):
+    """
+    Prefer the message this command replied to; otherwise use the one
+    immediately above in the same channel/thread.
+    """
+    ref = getattr(ctx.message, "reference", None)
+    if ref:
+        # If Discord already resolved the reference, use it; otherwise fetch.
+        if getattr(ref, "resolved", None) and isinstance(ref.resolved, discord.Message):
+            return ref.resolved
+        if getattr(ref, "message_id", None):
+            try:
+                return await ctx.channel.fetch_message(ref.message_id)
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                pass  # fall back to history
+
+    # Fallback: previous message in this channel/thread
+    msgs = [m async for m in ctx.channel.history(limit=2)]
+    return msgs[1] if len(msgs) >= 2 else None
+
+
 @aos_bot.command(
     name='noogbot',
-    help='Repeat the previous message, but rephrased in a dumb way that often misses the point.'
+    help='Repeat the previous message (or the replied-to message) in a dumb, off-point way.'
 )
 async def noogbot_cmd(ctx):
     try:
-        # Pull the two most recent messages in this channel: [0] is the command, [1] is the one above it
-        msgs = [m async for m in ctx.channel.history(limit=2)]
-        if len(msgs) < 2:
-            return await ctx.send(":warning: I cannot see a previous message here.")
+        target = await _get_target_message(ctx)
+        if not target:
+            return await ctx.send(":warning: I cannot find a message to echo.")
 
-        prev = msgs[1]
-
-        # Prefer the text content; if empty, try a small text attachment
-        prev_text = (prev.content or "").strip()
-
-        # Optionally try to read a small text attachment if no content
-        if not prev_text and prev.attachments:
-            for att in prev.attachments:
+        # Prefer text; if empty, try a small text attachment
+        prev_text = (target.content or "").strip()
+        if not prev_text and target.attachments:
+            for att in target.attachments:
                 if (att.size or 0) <= 200_000 and att.content_type and "text" in att.content_type:
                     try:
-                        prev_text = (await att.read()).decode("utf-8", errors="replace")
-                        prev_text = prev_text[:4000]  # keep it reasonable
+                        prev_text = (await att.read()).decode("utf-8", errors="replace")[:4000]
                         break
                     except Exception:
                         pass
 
         if not prev_text:
-            return await ctx.send(":warning: The previous message had no readable text.")
+            return await ctx.send(":warning: That message had no readable text.")
 
-        # Call OpenAI to "dumbly rephrase" the text
-        # Uses your existing OPENAI_API_KEY setup
         system_prompt = (
             "You are NoogBot. You repeat what someone else said, but in a dumber way, "
             "often missing the point. Keep it short, a bit confused, and kind of wrong. "
-            "Do not add explanations about what you are doing. Use plain ASCII only."
+            "Do not explain what you are doing. Use plain ASCII only, and limited punctuation."
         )
-
         user_prompt = (
             "Rephrase this so it sounds dumber and slightly off the point. Keep it brief.\n\n"
             f"TEXT:\n{prev_text}"
@@ -1844,12 +1856,12 @@ async def noogbot_cmd(ctx):
         except Exception as e:
             return await ctx.send(f":x: OpenAI error: {e}")
 
-        # Reuse your truncation helper to be safe for Discord limits
         out = truncate_content(reply, max_len=1900)
         await ctx.send(out)
 
     except Exception as e:
         await ctx.send(f":x: Error: {e}")
+
 
 
 
