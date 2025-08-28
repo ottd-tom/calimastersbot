@@ -721,6 +721,9 @@ async def pairings_cmd(ctx, *, args: str):
 @aos_bot.command(name='itcrank', aliases=['crankit'], help='Show ITC placing and points for a player (via BCP API)')
 async def itcrank_cmd(ctx, *, name: str):
     name = name.strip()
+    if name=='e' or name=='E':
+        await ctx.send("Dirty creature")
+        name = "e pryor"
     if len(name) < 3:
         return await ctx.send("Please provide at least 3 characters for the name search.")
 
