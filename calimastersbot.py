@@ -605,89 +605,64 @@ class PairingsView(discord.ui.View):
 async def do_pairings(ctx, ev, requested_round: int | None = None, first_names: set[str] | None = None):
     ev_name, ev_id = ev["name"], ev["id"]
     headers = {
-        "Accept":     "application/json",
-        "x-api-key":  BCP_API_KEY,
-        "client-id":  CLIENT_ID,
-        "User-Agent": "AoSBot/1.0",
+        "Accept":      "application/json",
+        "x-api-key":   BCP_API_KEY,
+        "client-id":   CLIENT_ID,
+        "User-Agent":  "AoSBot/1.0",
     }
 
     pairings = []
     chosen_round = requested_round
 
-    # fetch pairings for the requested round or latest round if not specified
-    try:
-        if requested_round is not None:
-            url = f"https://api.bestcoastpairings.com/v1/pairings?eventId={ev_id}&round={requested_round}"
-            resp = requests.get(url, headers=headers, timeout=30)
-            if resp.status_code == 200:
-                data = resp.json()
-                pairings = data.get("pairings", [])
-        else:
-            # find latest round number
-            url = f"https://api.bestcoastpairings.com/v1/pairings?eventId={ev_id}"
-            resp = requests.get(url, headers=headers, timeout=30)
-            if resp.status_code == 200:
-                data = resp.json()
-                all_pairings = data.get("pairings", [])
-                if all_pairings:
-                    chosen_round = max(p.get("round", 0) for p in all_pairings)
-                    pairings = [p for p in all_pairings if p.get("round") == chosen_round]
-    except Exception as e:
-        return await ctx.send(f":warning: Error fetching pairings for `{ev_name}`: {e}")
+    async with aiohttp.ClientSession() as session:
+        rounds = [requested_round] if requested_round else list(range(8, 0, -1))
+        for rnd in rounds:
+            params = {"eventId": ev_id, "round": rnd, "pairingType": "Pairing"}
+            async with session.get(f"{BASE_EVENT_URL}/{ev_id}/pairings", params=params, headers=headers) as presp:
+                presp.raise_for_status()
+                raw = await presp.json()
+
+            active = raw.get("active") or raw.get("data", [])
+            if active:
+                pairings = active
+                chosen_round = rnd
+                break
 
     if not pairings:
         if requested_round:
-            return await ctx.send(
-                f":warning: No pairings found for `{ev_name}` ({ev_id}) in round {requested_round}."
-            )
-        else:
-            return await ctx.send(f":warning: No pairings found for `{ev_name}` ({ev_id}).")
+            return await ctx.send(f":warning: No pairings found for `{ev_name}` ({ev_id}) in round {requested_round}.")
+        return await ctx.send(f":warning: No pairings found for `{ev_name}` ({ev_id}).")
 
-    # Optional filtering by first names
+    # Optional first-name filter
     if first_names:
         want = {n.strip().lower() for n in first_names if n.strip()}
-
-        def has_target(p):
-            u1 = p.get("player1", {}).get("user", {}) or {}
-            n1 = (u1.get("firstName") or "").lower()
-            if n1 in want:
+        def hit(p):
+            u1 = (p.get("player1") or {}).get("user") or {}
+            if (u1.get("firstName") or "").lower() in want:
                 return True
-            if p.get("player2"):
-                u2 = p.get("player2", {}).get("user", {}) or {}
-                n2 = (u2.get("firstName") or "").lower()
-                if n2 in want:
-                    return True
-            return False
-
-        pairings = [p for p in pairings if has_target(p)]
+            u2 = (p.get("player2") or {}).get("user") or {}
+            return (u2.get("firstName") or "").lower() in want
+        pairings = [p for p in pairings if hit(p)]
         if not pairings:
-            return await ctx.send(
-                f":mag: No pairings in round {chosen_round} for requested names at `{ev_name}`."
-            )
+            return await ctx.send(f":mag: No pairings in round {chosen_round} for requested names at `{ev_name}`.")
 
-    header = f"Pairings for {ev_name} ({ev_id}) — Round {chosen_round}"
-    if first_names:
-        header += " [filtered]"
-    cols = "Player 1 Name         | Pts | Player 2 Name         | Pts"
+    header = f"Pairings for {ev_name} ({ev_id}) — Round {chosen_round}" + (" [filtered]" if first_names else "")
+    cols    = "Player 1 Name         | Pts | Player 2 Name         | Pts"
     divider = "-" * len(cols)
 
     lines = [header, cols, divider]
     for p in pairings:
-        p1 = p.get("player1", {})
-        p2 = p.get("player2", {})
-        u1 = p1.get("user", {}) or {}
-        u2 = p2.get("user", {}) or {}
-        n1 = f"{u1.get('firstName','')} {u1.get('lastName','')}".strip()
-        n2 = f"{u2.get('firstName','')} {u2.get('lastName','')}".strip()
-        s1 = p1.get("score", "")
-        s2 = p2.get("score", "")
-        line = f"{n1:20.20} | {s1:<3} | {n2:20.20} | {s2:<3}"
-        lines.append(line)
+        u1 = p["player1"]["user"]; name1 = f"{u1['firstName']} {u1['lastName']}"
+        pts1 = p.get("player1Game", {}).get("points", "")
+        if p.get("player2"):
+            u2 = p["player2"]["user"]; name2 = f"{u2['firstName']} {u2['lastName']}"
+            pts2 = p.get("player2Game", {}).get("points", "")
+        else:
+            name2, pts2 = "(bye)", ""
+        lines.append(f"{name1:<22} | {pts1:^3} | {name2:<22} | {pts2:^3}")
 
     await send_lines(ctx, lines)
-    await ctx.send(
-        f"View full pairings: https://www.bestcoastpairings.com/event/{ev_id}?active_tab=pairings"
-    )
+    await ctx.send(f"View full pairings: https://www.bestcoastpairings.com/event/{ev_id}?active_tab=pairings")
 
 
 @aos_bot.command(
@@ -695,12 +670,11 @@ async def do_pairings(ctx, ev, requested_round: int | None = None, first_names: 
     help="!pairings [round] <event_search> OR !pairings [round] <event_search> | <first names>"
 )
 async def pairings_cmd(ctx, *, args: str):
-    # default values
     requested_round: int | None = None
     first_names: set[str] | None = None
     query = args.strip()
 
-    # split out round number if present
+    # optional round
     parts = query.split(maxsplit=1)
     if len(parts) == 2 and parts[0].isdigit():
         rnd = int(parts[0])
@@ -710,56 +684,52 @@ async def pairings_cmd(ctx, *, args: str):
         else:
             return await ctx.send(":warning: Round must be between 1–8.")
 
-    # split off optional name filter using "|"
+    # optional name filter
     if "|" in query:
         event_part, names_part = query.split("|", 1)
         query = event_part.strip()
-        raw_names = re.split(r"[,\s]+", names_part.strip())
-        raw_names = [n for n in raw_names if n]
+        raw_names = [n for n in re.split(r"[,\s]+", names_part.strip()) if n]
         if raw_names:
-            first_names = set(n.lower() for n in raw_names)
+            first_names = {n.lower() for n in raw_names}
 
     if len(query) < 4:
         return await ctx.send(":warning: Please use at least 4 characters for your search.")
 
-    # fetch events from API
+    # fetch events (newprod + aiohttp)
+    today    = datetime.utcnow().date() + timedelta(days=3)
+    week_ago = today - timedelta(days=7)
+    params = {
+        "limit":        100,
+        "sortAscending":"true",
+        "sortKey":      "eventDate",
+        "startDate":    week_ago.isoformat(),
+        "endDate":      today.isoformat(),
+        "gameType":     "4",
+    }
     headers = {
         "Accept":     "application/json",
         "x-api-key":  BCP_API_KEY,
         "client-id":  CLIENT_ID,
         "User-Agent": "AoSBot/1.0",
     }
-    url = "https://api.bestcoastpairings.com/v1/events?gameSystemId=3&days=7"
-    try:
-        resp = requests.get(url, headers=headers, timeout=30)
-        events = resp.json().get("events", []) if resp.status_code == 200 else []
-    except Exception as e:
-        return await ctx.send(f":warning: Error fetching events: {e}")
 
-    # search matches
+    async with aiohttp.ClientSession() as session:
+        async with session.get(BASE_EVENT_URL, params=params, headers=headers) as resp:
+            resp.raise_for_status()
+            events = (await resp.json()).get("data", [])
+
     matches = _search_matches(events, query)
     if not matches:
         return await ctx.send(f":mag: No AoS events this week matching `{query}`.")
 
-    # single event -> go straight to pairings
     if len(matches) == 1:
-        return await do_pairings(
-            ctx,
-            matches[0],
-            requested_round=requested_round,
-            first_names=first_names,
-        )
+        return await do_pairings(ctx, matches[0], requested_round=requested_round, first_names=first_names)
 
-    # multiple events -> present selector
     await ctx.send(
         "Multiple events found—please pick one:",
-        view=PairingsView(
-            matches,
-            ctx,
-            first_names=first_names,
-            requested_round=requested_round,
-        ),
+        view=PairingsView(matches, ctx, first_names=first_names, requested_round=requested_round),
     )
+
 
 
 
@@ -1344,7 +1314,7 @@ async def help_cmd(ctx):
              "!playerwr <player_name>",
              "!standings <event_search>",
              "!standingsfull <event_search>",
-             "!pairings [round] <event_search> [| <first names>]"
+             "!pairings [round] <event_search> [| <first names>]",
              "!stathammer 15a 3h 4w 2r d6d [<n>cm|cw|ch]",
              "",
              "Source: https://aos-events.com"]
