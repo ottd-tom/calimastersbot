@@ -662,7 +662,7 @@ async def do_pairings(ctx, ev, requested_round: int | None = None, first_names: 
         lines.append(f"{name1:<22} | {pts1:^3} | {name2:<22} | {pts2:^3}")
 
     await send_lines(ctx, lines)
-    if not firest_names:
+    if not first_names:
         await ctx.send(f"View full pairings: https://www.bestcoastpairings.com/event/{ev_id}?active_tab=pairings")
 
 
