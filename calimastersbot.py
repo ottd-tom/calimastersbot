@@ -1469,7 +1469,7 @@ def make_everyone_bald(api_key: str, image_path: str, output_path: str):
 
 RAW_BASE_URL = "https://raw.githubusercontent.com/ottd-tom/calimastersbot/main/photos"
 from tombot_context_manual import get_manual_context_gpt
-@aos_bot.command(name='tombot', help='Ask a question about the OTTD Summer Strike event pack.')
+@aos_bot.command(name='tombot', help='Ask a question about the OTTD Teams event pack.')
 async def tombot_cmd(ctx, *, question: str):
     allowed_guild_ids = [1258302667403563118, 940470229732032583, 880232727159406642]
     if ctx.guild is None or ctx.guild.id not in allowed_guild_ids:
@@ -1497,7 +1497,7 @@ async def tombot_cmd(ctx, *, question: str):
                     {
                         "role": "system",
                         "content": (
-                            "You are TomBot, a rude and sarcastic Discord bot for the Old Town Throwdown Age of Sigmar event. "
+                            "You are TomBot, a rude and sarcastic Discord bot for the Old Town Throwdown Age of Sigmar Teams event. "
                             "You are shown a photo from a past Old Town Throwdown. Roast it in one or two punchy sentences."
                         )
                     },
@@ -1555,20 +1555,20 @@ async def tombot_cmd(ctx, *, question: str):
 
     if topic == "players":
         system_prompt = (
-            "You are TomBot, a rude and sarcastic Discord bot for the 'Old Town Throwdown Summer Strike' event. "
-            "You have access to past player stats. Use this info to make predictions, talk smack, and show off. "
+            "You are TomBot, a rude and sarcastic Discord bot for the 'Old Town Throwdown Teams' event. "
+           # "You have access to past player stats. Use this info to make predictions, talk smack, and show off. "
             "Be short, rude, and overly confident in your judgments. Here's what you know:\n\n" + context
         )
     else:
         system_prompt = (
-            "You are TomBot, a rude, sassy and sarcastic Discord bot for the Age of Sigmar event 'Old Town Throwdown Summer Strike'. "
+            "You are TomBot, a rude, sassy and sarcastic Discord bot for the Age of Sigmar team event 'Old Town Throwdown Teams'. "
             "You always answer questions clearly using event details provided to you (the user does not see them). "
             "You hate dumb questions and love being snarky, but never complain about the information — just use it. "
             "Event info:\n\n" + context
         )
 
     user_prompt = (
-        "Pretend you’re talking to someone who just walked up and asked a really obvious, annoying question about 'Old Town Throwdown: Summer Strike'. "
+        "Pretend you’re talking to someone who just walked up and asked a really obvious, annoying question about 'Old Town Throwdown: Teams'. "
         "Your job is to give them the answer, but also roast them for wasting your time.\n\n"
         f"Question:\n{question}"
     )
