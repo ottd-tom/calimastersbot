@@ -1,19 +1,1 @@
-ROUND TIMING
-Each round is 3 hours.
 
-If a game has not reached a conclusion by the end of the round, the players must come to an agreement (math-hammer) on who would win and which auxiliary objectives would be scored if the game had concluded 5 full battle rounds. If agreement can not be made, a TO should be informed, and the TO’s decision will be final.
-
-PLAYER CONCEDES
-If a player concedes, they receive a major loss and their opponent receives a major victory. Their opponent also scores all possible remaining battle tactics and denies all remaining battle tactics.
-For example, if player A concedes after the top of turn 2 (having taking turn 2), their opponent would score 4 rounds of battle tactics [rounds 2,3,4,5], plus 3 rounds of denies [rounds 3,4,5], plus any points they had already achieved for battle tactics up until that point.
-
-PLAYER TABLED
-If a player is tabled, the game does not immediately end. The remainder of the game should be played out, or the players should come to an agreement (math-hammer) on who would win and which auxiliary objectives would be scored if the game had concluded 5 full battle rounds.
-
-
-
-  LATE ARRIVALS AND BYES
-   * If more than one player arrives late for the first round, the late arrivals will be paired against each other.
-   * If there is an odd late arrival in the first round, they will receive zero points.
-   * If a player arrives more than 15 minutes late for a round other than the first, they score zero for that round (and the opponent scores 30).
-   * If there is an odd number of players, one player may receive a Bye. In the first round of the tournament the Bye is chosen at random and receives 40 points. In the subsequent rounds the Bye receives 30 points.
