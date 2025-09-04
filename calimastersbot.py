@@ -1812,6 +1812,14 @@ async def tomtomtombot_cmd(ctx):
     phrase = random.choice(tomtomtom_phrases)
     await ctx.send(phrase)
 
+bcpbarker_phrases = [
+    "Hey thanks for reaching out! That’s a great question. Let me get some more info and get back with you soon."
+]
+@aos_bot.command(name='bcpbarkerbot')
+async def bcpbarkbot_cmd(ctx):
+    phrase = random.choice(bcpbarker_phrases)
+    await ctx.send(phrase)
+                 
 
 async def _get_target_message(ctx):
     """
