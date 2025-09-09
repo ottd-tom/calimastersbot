@@ -1795,6 +1795,14 @@ async def adambot_cmd(ctx):
     phrase = random.choice(adam_phrases)
     await ctx.send(phrase)
 
+jo_phrases = [
+    "(Not knowing context since I'm at work, so quick response) I love a good pp"
+]
+@aos_bot.command(name='jobot', help='Get your AoS Questions answered')
+async def jobot_cmd(ctx):
+    phrase = random.choice(jo_phrases)
+    await ctx.send(phrase)
+
 
 tomtom_phrases = [
     "Tom's so smart"
