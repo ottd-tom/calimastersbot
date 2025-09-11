@@ -1803,6 +1803,17 @@ async def jobot_cmd(ctx):
     phrase = random.choice(jo_phrases)
     await ctx.send(phrase)
 
+tymon_phrases = [
+    "It's ironic to me, I've always been able to relate to military people.
+Even though I'm a Rasta at heart, I've regularly had people ask me if I have been in the military,
+after seeing me work/perform so systematically.
+And although I've never served, I have watched a lot of my close friend die horrific deaths, I've killed a lot of people myself and I'm not a good person.
+I don't care where you lay politically just know that running your mouth might get you touched."
+]
+@aos_bot.command(name='tymon', help='Get your AoS Questions answered')
+async def tymon_cmd(ctx):
+    phrase = random.choice(tymon_phrases)
+    await ctx.send(phrase)
 
 tomtom_phrases = [
     "Tom's so smart"
