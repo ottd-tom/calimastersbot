@@ -1806,7 +1806,7 @@ async def jobot_cmd(ctx):
 tymon_phrases = [
     "It's ironic to me, I've always been able to relate to military people.\nEven though I'm a Rasta at heart, I've regularly had people ask me if I have been in the military,\nafter seeing me work/perform so systematically.\nAnd although I've never served, I have watched a lot of my close friend die horrific deaths, I've killed a lot of people myself and I'm not a good person.\nI don't care where you lay politically just know that running your mouth might get you touched."
 ]
-@aos_bot.command(name='tymon', help='Get your AoS Questions answered')
+@aos_bot.command(name='tymonbot', help='Get your AoS Questions answered')
 async def tymon_cmd(ctx):
     phrase = random.choice(tymon_phrases)
     await ctx.send(phrase)
@@ -1835,6 +1835,67 @@ async def bcpbarkbot_cmd(ctx):
     phrase = random.choice(bcpbarker_phrases)
     await ctx.send(phrase)
                  
+@aos_bot.command(name="adjudicate")
+async def adjudicate(ctx):
+    # Must be used as a reply
+    if not ctx.message.reference:
+        return  # do nothing if not a reply
+
+    # Get the referenced message
+    replied_message = await ctx.channel.fetch_message(ctx.message.reference.message_id)
+    username = replied_message.author.name
+
+    clever_lines = [
+        "This was a clever and witty post.",
+        "A stroke of genius, truly.",
+        "Sharp and well-delivered.",
+        "Smartly put — impressive.",
+        "A shining example of wit.",
+        "Both clever and amusing."
+    ]
+
+    dumb_lines = [
+        "This was a dumb post.",
+        "That was not your brightest moment.",
+        "Pretty foolish, honestly.",
+        "This didn’t age well.",
+        "Not exactly a smart contribution.",
+        "This was rather silly."
+    ]
+
+    wordy_lines = [
+        "This was an overly wordy and articulate post.",
+        "Verbose, yet strangely compelling.",
+        "An ocean of words for a drop of meaning.",
+        "Grandiose and articulate to a fault.",
+        "A masterclass in over-explaining.",
+        "Drenched in unnecessary eloquence."
+    ]
+
+    mediocre_lines = [
+        "This post was mediocre.",
+        "Nothing to write home about.",
+        "Utterly average.",
+        "Neither here nor there.",
+        "Decidedly unremarkable.",
+        "Solidly… meh."
+    ]
+
+    # Pick responses based on user
+    if username.lower() == "thommo":
+        response = random.choice(clever_lines)
+    elif username.lower() == "rozkun":
+        response = random.choice(dumb_lines)
+    elif username.lower() == "artemacus":
+        response = random.choice(wordy_lines)
+    else:
+        response = random.choice(mediocre_lines)
+
+    await ctx.send(response)
+
+
+
+
 
 async def _get_target_message(ctx):
     """
