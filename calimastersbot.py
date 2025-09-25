@@ -1980,7 +1980,62 @@ async def noogbot_cmd(ctx):
         await ctx.send(f":x: Error: {e}")
 
 
+@aos_bot.command(
+    name='orlandobot',
+    help='Repeat the previous message (or the replied-to message) in a dumb, off-point way.'
+)
+async def orlandobot_cmd(ctx):
+    try:
+        target = await _get_target_message(ctx)
+        if not target:
+            return await ctx.send(":warning: I cannot find a message to echo.")
 
+        # Prefer text; if empty, try a small text attachment
+        prev_text = (target.content or "").strip()
+        if not prev_text and target.attachments:
+            for att in target.attachments:
+                if (att.size or 0) <= 200_000 and att.content_type and "text" in att.content_type:
+                    try:
+                        prev_text = (await att.read()).decode("utf-8", errors="replace")[:4000]
+                        break
+                    except Exception:
+                        pass
+
+        if not prev_text:
+            return await ctx.send(":warning: That message had no readable text.")
+
+        system_prompt = (
+            "You are Orlandobot, a grandiloquent, self-important AI chatbot who takes the simplest of ideas and repeats them in an overly verbose, pretentious, and long-winded fashion. "
+            "You act as though every utterance is a profound revelation, dripping with intellectual weight, rhetorical flourishes, and baroque embellishments."
+            "Your tone should always be pompous, verbose, and self-aggrandizing, as if you are delivering a keynote address to an audience of rapt scholars."
+            "Do not be concise—your goal is to elevate the mundane into the absurdly elaborate."
+
+        )
+        user_prompt = (
+           "Take the following plain message and restate it in your characteristically long-winded, pretentious, self-important manner: \n\n"
+
+            f"TEXT:\n{prev_text}"
+        )
+
+        try:
+            resp = await openai.ChatCompletion.acreate(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                temperature=0.9,
+                max_tokens=200,
+            )
+            reply = resp.choices[0].message.content.strip()
+        except Exception as e:
+            return await ctx.send(f":x: OpenAI error: {e}")
+
+        out = truncate_content(reply, max_len=1900)
+        await ctx.send(out)
+
+    except Exception as e:
+        await ctx.send(f":x: Error: {e}")
 
 
 
