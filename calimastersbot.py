@@ -1797,6 +1797,14 @@ async def adambot_cmd(ctx):
     phrase = random.choice(adam_phrases)
     await ctx.send(phrase)
 
+e_phrases = [
+    "Ligmar has low intelligence, high loyalty."
+]
+@aos_bot.command(name='ebot', help='Get your AoS Questions answered')
+async def ebot_cmd(ctx):
+    phrase = random.choice(e_phrases)
+    await ctx.send(phrase)
+
 jo_phrases = [
     "(Not knowing context since I'm at work, so quick response) I love a good pp"
 ]
