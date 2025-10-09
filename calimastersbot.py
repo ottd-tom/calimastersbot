@@ -1742,7 +1742,8 @@ maddy_phrases = [
     "I can hide behind terrain. Like, any terrain.",
     "My reach is emotional, not physical.",
     "Chairs are just unnecessarily tall tables.",
-    "I would think you could relate to the joy of seeing the light drain from your opponent's eyes"
+    "I would think you could relate to the joy of seeing the light drain from your opponent's eyes.",
+    "As a child, I was not fortunate enough to have stuffed animals."
 ]
 
 @aos_bot.command(name='maddybot', help='Get your AoS Questions answered')
