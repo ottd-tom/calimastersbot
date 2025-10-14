@@ -1777,6 +1777,7 @@ tombot_phrase_weights = [
     ("snap",                                 5),
     ("madge",                                3),
     ("I love junk",                          3),
+    ("they call me the compliment machine",  1),
     (SUN_TZU_AOS_STRAT, 0.000001)
 ]
 
