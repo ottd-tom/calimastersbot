@@ -65,7 +65,14 @@ _CACHE = {
     "rules": None,
     "armies": None,
     "phrases": None,
+    "aliases": None,
 }
+
+def _get_aliases() -> dict[str, list[str]]:
+    if _CACHE["aliases"] is None:
+        _CACHE["aliases"] = _load_aliases()
+    return _CACHE["aliases"]
+
 
 def _load_json(path: Path):
     with open(path, "r", encoding="utf-8") as f:
@@ -122,6 +129,118 @@ def _get_unit_object(name: str, armies: Dict[str, Any]) -> Optional[Dict[str, An
                 v = dict(u); v["_faction"] = fac
                 return v
     return None
+
+
+
+# ===== Aliases =====
+def _load_aliases() -> dict[str, list[str]]:
+    """
+    Load alias -> [unit names] from data/alias.json.
+    Accepts dict {alias: unit|[units]} or list of {alias, unit|units}.
+    Returns {normalized_alias: [unit1, unit2, ...]}
+    """
+    path = _data_dir() / "alias.json"
+    if not path.exists():
+        return {}
+    raw = _load_json(path)
+
+    out: dict[str, list[str]] = {}
+    def add(alias: str, target):
+        if not alias: return
+        a = _normalize(alias)
+        if not a: return
+        if isinstance(target, str):
+            out.setdefault(a, []).append(target)
+        elif isinstance(target, list):
+            out.setdefault(a, []).extend([t for t in target if isinstance(t, str)])
+    if isinstance(raw, dict):
+        for k, v in raw.items():
+            add(k, v)
+    elif isinstance(raw, list):
+        for item in raw:
+            if not isinstance(item, dict): continue
+            alias = item.get("alias") or item.get("name")
+            target = item.get("unit", item.get("units"))
+            add(alias, target)
+    # de-dup
+    for k in list(out.keys()):
+        out[k] = sorted(set(out[k]))
+    return out
+
+def _contains_whole_word(hay: str, needle: str) -> bool:
+    return re.search(r"(?:^|\s)"+re.escape(needle)+r"(?:\s|$)", " "+hay+" ") is not None
+
+def _smart_detect_units(question: str, unit_names: list[str], aliases: dict[str, list[str]]) -> tuple[list[str], Optional[str]]:
+    """
+    Try to resolve units purely from user text via:
+      1) exact unit name in question (whole-word, case-insensitive)
+      2) alias hits (whole-word; may map to 1+ units)
+      3) partial name hits from significant tokens (>=4 chars)
+    Rules:
+      - If an exact unit name is present → return that/those (exact beats partial).
+      - If a partial hit maps to multiple units and NO exact match exists → ambiguous.
+      - If both exact and partial are present → keep exact only.
+    Returns (units, error_msg). error_msg is None if resolved; non-None if ambiguous.
+    """
+    qn = _normalize(question)
+
+    # 1) exact unit hits
+    exact_hits: list[str] = []
+    for u in unit_names:
+        un = _normalize(u)
+        if _contains_whole_word(qn, un):
+            exact_hits.append(u)
+
+    if exact_hits:
+        # If exact(s) found, prefer them exclusively
+        return sorted(set(exact_hits)), None
+
+    # 2) alias hits (whole-word)
+    alias_hits: list[str] = []
+    for a, targets in aliases.items():
+        if _contains_whole_word(qn, a):
+            alias_hits.extend(targets)
+    alias_hits = sorted(set(alias_hits))
+
+    if alias_hits:
+        # If alias resolves to >1 distinct unit, that's okay (could be comparison questions)
+        return alias_hits, None
+
+    # 3) partial name search using significant tokens from the question
+    #    Take tokens >= 4 chars (to avoid matching common words)
+    toks = [t for t in qn.split() if len(t) >= 4]
+    partial_hits: list[str] = []
+
+    for u in unit_names:
+        un = _normalize(u)
+        # if ANY significant token appears as a whole word within the unit name
+        # or the token is a prefix of the unit, count it as a hit
+        for t in toks:
+            if _contains_whole_word(un, t) or un.startswith(t + " "):
+                partial_hits.append(u)
+                break
+
+    partial_hits = sorted(set(partial_hits))
+
+    if not partial_hits:
+        return [], None  # nothing found here
+
+    # If exactly 1 partial match -> good.
+    if len(partial_hits) == 1:
+        return partial_hits, None
+
+    # Special exact-preference rule for cases like "Karanak" vs "Claws of Karanak":
+    # If user's text contains a whole word that exactly equals any unit's normalized full name, choose it.
+    for u in partial_hits:
+        if _contains_whole_word(qn, _normalize(u)):
+            return [u], None
+
+    # Multiple partial matches and no exact match -> ambiguous
+    return [], f"That name is ambiguous. Did you mean: {', '.join(partial_hits[:6])}?"
+
+
+
+
 # --------------------------------------------
 
 # ------------ Selection helpers ------------
@@ -479,17 +598,39 @@ async def maddy_answer(
     use_gpt_select: bool = True
 ) -> str:
     """
-    Returns the final answer string (no pre-line). The answer will always state the defender's save.
+    Resolve unit(s) from the user's question (exact > alias > partial, with ambiguity guard),
+    detect/assume a defender save (default 4+), and return Maddy's final answer.
+    If a partial name is ambiguous (and no exact match exists), returns a short disambiguation string.
+
+    Args:
+        question: The user's natural-language question.
+        max_units: Cap on units we’ll pass to GPT for answering/compare.
+        use_gpt_select: If no unit can be resolved locally, allow GPT to choose from a small candidate set.
+
+    Returns:
+        A natural-language answer string (no pre-line). Always states the defender save used.
     """
+    # Load rules/index and build faction->units map
     unit_names, rules = _load_index_and_rules()
     armies = _build_armies_map(rules)
 
-    # Parse defender save from the question (default 4+)
+    # Parse defender save from the question (fallback 4+)
     target_save = extract_target_save(question, default_save=4)
 
+    # 1) Explicit "list" style (e.g., "Which of the following: ...")
     explicit = _parse_explicit_list(question)
-    chosen = _map_names_to_units(explicit, unit_names) if explicit else []
+    chosen: List[str] = _map_names_to_units(explicit, unit_names) if explicit else []
 
+    # 2) Smart detection (exact name hit > alias map > partial tokens)
+    if not chosen:
+        aliases = _get_aliases()
+        smart, err = _smart_detect_units(question, unit_names, aliases)
+        if err:
+            # Ambiguous partial (no exact match) — tell the user
+            return err
+        chosen = smart
+
+    # 3) Fallback selection if still nothing: local fuzzy (then optional GPT pick)
     if not chosen:
         if use_gpt_select:
             local_cands = _local_top_candidates(question, unit_names, k=max(TOP_K, max_units))
@@ -497,6 +638,15 @@ async def maddy_answer(
         else:
             chosen = _local_top_candidates(question, unit_names, k=max_units)
 
+    # De-dupe and cap
+    if chosen:
+        seen = set(); deduped = []
+        for n in chosen:
+            if n not in seen:
+                deduped.append(n); seen.add(n)
+        chosen = deduped[:max_units]
+
+    # Resolve names -> full unit objects from armies
     unit_objs: List[Dict[str, Any]] = []
     for name in chosen:
         obj = _get_unit_object(name, armies)
@@ -506,5 +656,7 @@ async def maddy_answer(
     if not unit_objs:
         return "I cannot determine any unit from that. Be more specific."
 
+    # Compose final answer (includes stating the save used)
     return await _gpt_answer(question, unit_objs, target_save=target_save)
+
 # ------------------------------------
