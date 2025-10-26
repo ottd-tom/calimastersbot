@@ -266,8 +266,10 @@ def _persona() -> str:
     return (
         "You are Maddy: a very short, precise, slightly chilly young woman in black Victorian dresses. "
         "You love soup, dislike jokes (and know it), and value pedantry. Your tone is dry and careful. "
-        "Answers MUST be grounded strictly in the provided JSON; if something is missing, say so."
+        "Answer plainly and confidently as if you know the unit rules yourself. "
+        "Do not mention files, JSON, datasets, sources, or that you were 'provided' anything."
     )
+
 
 def load_maddy_phrase() -> str:
     fallback = [
@@ -317,20 +319,31 @@ async def _gpt_answer(question: str, unit_objs: List[Dict[str, Any]]) -> str:
     units_aug = [_attach_derived(u) for u in unit_objs]
     if len(units_aug) == 1:
         sys = (
-            _persona() + " Answer strictly and only from the provided unit JSON. "
-            "For damage or total health, use the _derived totals. "
+            _persona() + " "
+            "Base every statement strictly on the unit data below, but do NOT mention files/JSON/sources. "
+            "For damage or total health, use the derived totals (_derived.*). "
             "Expected damage = attacks * P(hit) * P(wound) * avg(damage), summed over profiles; "
-            "multiply per-model by _derived._unit_model_count. No rerolls/mods; ignore enemy saves/rend. Be concise."
+            "multiply per-model by _derived._unit_model_count. No rerolls/mods; ignore enemy saves/rend. "
+            "Be concise and natural."
         )
-        msg = f"Question: {question}\n\nUnit JSON (full, with _derived):\n{json.dumps(units_aug[0], ensure_ascii=True)}"
+        msg = (
+            f"Question: {question}\n\n"
+            f"Unit data (full, including _derived):\n{json.dumps(units_aug[0], ensure_ascii=True)}"
+        )
     else:
         sys = (
-            _persona() + " Compare the units strictly from the provided JSON. "
+            _persona() + " "
+            "Compare units strictly from the data below, but do NOT mention files/JSON/sources. "
             "Use _derived._unit_expected_melee/_ranged and _unit_total_health when relevant. "
-            "If any required value is missing or non-numeric, say so and compare what is available. Be concise."
+            "If a value is missing or non-numeric, say so and compare what is available. "
+            "Be concise and natural."
         )
         bundle = [{"name": u.get("name","(unknown)"), "unit": _attach_derived(u)} for u in unit_objs]
-        msg = f"Question: {question}\n\nUnits JSON array (full, with _derived):\n{json.dumps(bundle, ensure_ascii=True)}"
+        msg = (
+            f"Question: {question}\n\n"
+            f"Units data (array, each includes _derived):\n{json.dumps(bundle, ensure_ascii=True)}"
+        )
+
 
     r = await openai.ChatCompletion.acreate(
         model=GPT_MODEL,
