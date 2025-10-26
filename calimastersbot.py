@@ -1586,7 +1586,7 @@ async def scionbot_cmd(ctx, *, question: str):
 
 import random
 from discord.ext import commands
-from maddybot import maddy_answer
+from maddybot import maddy_answer, get_maddy_preline
 
 maddy_phrases = [
     "I'm cold.",
@@ -1630,20 +1630,17 @@ maddy_phrases = [
 
 @aos_bot.command(name='maddybot', help='Ask Maddy an AoS unit question, or get a phrase if no question is given.')
 async def maddybot_cmd(ctx, *, question: str = None):
-    # No-arg behavior: keep your existing “phrase” response
+    # No-arg: keep your original single-line “personality quip”
     if not question or not question.strip():
         phrase = random.choice(maddy_phrases)  # your existing list
         return await ctx.send(phrase)
 
-    # With a question: use Maddy’s unit Q&A
+    # With a question: show exactly ONE pre-line (from the phrases file), then the final answer
     try:
-        # Show preline immediately (no network call yet)
-        res = await maddy_answer(question.strip(), max_units=5, use_gpt_select=True)
-        # Send pre-line as a separate message so it appears quickly
-        await ctx.send(res["preline"])
-        # Then the final answer
-        reply = truncate_content(res["answer"], max_len=1900)  # reuse your helper
-        await ctx.send(reply if reply.strip() else "…unsatisfying silence. (No content returned.)")
+        pre = get_maddy_preline()
+        await ctx.send(pre)
+        ans = await maddy_answer(question.strip(), max_units=5, use_gpt_select=True)
+        await ctx.send(truncate_content(ans, max_len=1900))
     except Exception as e:
         await ctx.send(f":x: Maddy failed to answer: {e}")
 
