@@ -7,7 +7,6 @@ from typing import Any, Dict, List, Optional
 GPT_MODEL = os.getenv("MADDY_GPT_MODEL", "gpt-4o-mini")
 DEFAULT_MAX_UNITS = 5
 TOP_K = 8
-# Optionally set MADDY_DATA_DIR env; else use ./data
 def _data_dir() -> Path:
     env = os.getenv("MADDY_DATA_DIR")
     return Path(env) if env else (Path(__file__).parent / "data")
@@ -19,7 +18,8 @@ def _normalize(s: str) -> str:
     s = re.sub(r"[^a-z0-9 ]+", "", s)
     return re.sub(r"\s+", " ", s).strip()
 
-def _parse_numeric(value: Any) -> Optional[float]:
+def _parse_numeric_unsigned(value: Any) -> Optional[float]:
+    """Unsigned numeric parse (legacy)."""
     if value is None: return None
     if isinstance(value, (int, float)): return float(value)
     s = str(value).strip().replace('"', "").replace("”", "").replace("“", "").rstrip("+")
@@ -27,9 +27,23 @@ def _parse_numeric(value: Any) -> Optional[float]:
     m = re.search(r"(\d+(\.\d+)?)", s)
     return float(m.group(1)) if m else None
 
+def _parse_numeric_signed(value: Any) -> Optional[float]:
+    """Signed parse for things like rend -1, -2, +1, etc."""
+    if value is None: return None
+    if isinstance(value, (int, float)): return float(value)
+    s = str(value).strip()
+    s = s.replace("−", "-")  # Unicode minus
+    s = s.replace('"', "").replace("”", "").replace("“", "")
+    # Allow optional sign
+    if re.fullmatch(r"[+-]?\d+(\.\d+)?", s):
+        return float(s)
+    m = re.search(r"([+-]?\d+(\.\d+)?)", s)
+    return float(m.group(1)) if m else None
+
 def _avg_dice(expr: str) -> Optional[float]:
+    """Average of dice like D3, D6, 2D6, D3+1, 2D3+3."""
     s = expr.strip().upper().replace(" ", "")
-    if re.fullmatch(r"\d+(\.\d+)?", s): return float(s)
+    if re.fullmatch(r"[+-]?\d+(\.\d+)?", s): return float(s)
     m = re.fullmatch(r"(?:(\d*)D(\d+))([+-]\d+)?", s)
     if not m: return None
     a = int(m.group(1)) if m.group(1) else 1
@@ -161,19 +175,19 @@ def _map_names_to_units(raw_names: List[str], unit_names: List[str]) -> List[str
     return results
 # ----------------------------------------
 
-# ------------ Derived stats ------------
+# ------------ Derived stats (no-save baseline) ------------
 def _estimate_model_count(unit: Dict[str, Any]) -> Optional[int]:
     models = unit.get("models")
     if isinstance(models, list) and models:
         m0 = models[0]
         if isinstance(m0, dict):
-            num = _parse_numeric(m0.get("max"))
+            num = _parse_numeric_unsigned(m0.get("max"))
             if num is not None:
                 try: return int(num)
                 except: pass
     bp = unit.get("battleProfile") or {}
     if isinstance(bp, dict):
-        num = _parse_numeric(bp.get("unit_size"))
+        num = _parse_numeric_unsigned(bp.get("unit_size"))
         if num is not None:
             try: return int(num)
             except: pass
@@ -194,8 +208,8 @@ def _iter_weapon_groups(unit: Dict[str, Any]):
 
 def _count_per_model_from_group(group: Dict[str, Any]) -> float:
     per = str(group.get("per", "")).lower()
-    minc = _parse_numeric(group.get("min"))
-    maxc = _parse_numeric(group.get("max"))
+    minc = _parse_numeric_unsigned(group.get("min"))
+    maxc = _parse_numeric_unsigned(group.get("max"))
     if per == "model":
         if minc is not None: return float(minc)
         if maxc is not None: return float(maxc)
@@ -205,53 +219,98 @@ def _count_per_model_from_group(group: Dict[str, Any]) -> float:
 def _is_melee_type(t):  return t in (0, "melee", "Melee", "MELEE")
 def _is_ranged_type(t): return t in (1, "ranged", "Ranged", "RANGED")
 
-def _expected_damage_per_model(unit: Dict[str, Any], *, melee: Optional[bool]) -> Optional[float]:
+# --- NEW: expected damage vs a target save (includes rend, random attacks/damage) ---
+def _expected_damage_per_model_vs_save(unit: Dict[str, Any], *, melee: Optional[bool], target_save: int) -> Optional[float]:
+    """
+    Expected unsaved damage per model vs a defender with save = target_save (2..6).
+    Includes:
+      - E(attacks) with dice averages,
+      - P(hit), P(wound),
+      - rend (signed, e.g., -1),
+      - E(damage) with dice averages.
+    """
     total = 0.0
     found = False
     model_count = _estimate_model_count(unit) or 1
+    base_save = int(target_save)
+    base_save = min(6, max(2, base_save))
+
     for group in _iter_weapon_groups(unit):
         profs = group.get("weapons")
         if not isinstance(profs, list): continue
-        cpm = _count_per_model_from_group(group)
+        cpm = _count_per_model_from_group(group)  # per model if per=="Model", else 1
         for prof in profs:
             if not isinstance(prof, dict): continue
             t = prof.get("type")
             if melee is True and not _is_melee_type(t):   continue
             if melee is False and not _is_ranged_type(t): continue
-            atk = _parse_numeric(prof.get("attack"))
+
+            # E(attacks)
+            atk_raw = prof.get("attack")
+            atk = None
+            if isinstance(atk_raw, (int, float)):
+                atk = float(atk_raw)
+            elif isinstance(atk_raw, str):
+                atk = _avg_dice(atk_raw)
+                if atk is None:
+                    atk = _parse_numeric_unsigned(atk_raw)
+            else:
+                atk = _parse_numeric_unsigned(atk_raw)
+
+            # E(damage)
             dmg_raw = prof.get("damage")
-            avgd = _parse_numeric(dmg_raw)
-            if avgd is None and isinstance(dmg_raw, str): avgd = _avg_dice(dmg_raw)
+            avgd = None
+            if isinstance(dmg_raw, (int, float)):
+                avgd = float(dmg_raw)
+            elif isinstance(dmg_raw, str):
+                avgd = _avg_dice(dmg_raw)
+                if avgd is None:
+                    avgd = _parse_numeric_unsigned(dmg_raw)
+            else:
+                avgd = _parse_numeric_unsigned(dmg_raw)
+
             ph = _prob_x_plus(prof.get("hit"))
             pw = _prob_x_plus(prof.get("wound"))
+            # Rend (signed)
+            rend_val = _parse_numeric_signed(prof.get("rend"))
+            if rend_val is None:
+                rend_val = 0.0
+
             if atk is None or avgd is None or ph is None or pw is None:
                 continue
+
+            # Effective save after rend. AoS: save roll needed = base_save - rend.
+            eff = base_save - int(round(rend_val))
+            # Clamp/save probabilities: best is 2+ (5/6), worst is >6 (0)
+            if eff < 2:
+                p_save = 5.0/6.0
+            elif eff <= 6:
+                p_save = (7 - eff) / 6.0
+            else:
+                p_save = 0.0
+
+            p_unsaved = 1.0 - p_save
+
             per = str(group.get("per", "")).lower()
             per_model_multiplier = cpm if per == "model" else (cpm / model_count if model_count else cpm)
-            total += per_model_multiplier * atk * ph * pw * avgd
+            # Multiply by E(attacks) * ph * pw * p_unsaved * E(damage)
+            total += per_model_multiplier * atk * ph * pw * p_unsaved * avgd
             found = True
+
     return total if found else None
 
 def _derive_fields(unit: Dict[str, Any]) -> Dict[str, Any]:
     d: Dict[str, Any] = {}
     count = _estimate_model_count(unit)
     if count is not None: d["_unit_model_count"] = count
-    per_model_health = _parse_numeric(unit.get("health", unit.get("wounds")))
+    per_model_health = _parse_numeric_unsigned(unit.get("health", unit.get("wounds")))
     if per_model_health is not None:
         d["_per_model_health"] = per_model_health
         if count is not None: d["_unit_total_health"] = per_model_health * count
-    melee_pm = _expected_damage_per_model(unit, melee=True)
-    if melee_pm is not None:
-        d["_per_model_expected_melee"] = melee_pm
-        if count is not None: d["_unit_expected_melee"] = melee_pm * count
-    ranged_pm = _expected_damage_per_model(unit, melee=False)
-    if ranged_pm is not None:
-        d["_per_model_expected_ranged"] = ranged_pm
-        if count is not None: d["_unit_expected_ranged"] = ranged_pm * count
+    # Keep the no-save baseline (may still be useful for general questions)
     d["_notes"] = [
-        "Expected damage = attacks * P(hit) * P(wound) * avg(damage), summed across profiles.",
-        "Totals multiply per-model by model count. No rerolls/mods. Ignores enemy saves/rend.",
-        "P(X+)=(7-X)/6. Dice averages: D3=2, D6=3.5, etc."
+        "Expected damage uses dice averages; totals multiply per-model by model count. "
+        "No rerolls/modifiers. Ignores wards and special rules."
     ]
     return d
 
@@ -261,15 +320,30 @@ def _attach_derived(unit: Dict[str, Any]) -> Dict[str, Any]:
     return v
 # --------------------------------------
 
+# ------------ Parse target save from the question ------------
+def extract_target_save(question: str, default_save: int = 4) -> int:
+    """
+    Find a token like '3+', '4+', '5+ save', optionally after 'vs/against/assuming'.
+    Returns 2..6; defaults to 4 if absent.
+    """
+    q = question.lower()
+    # prefer forms explicitly tied to save
+    m = re.search(r'(?:vs|against|into|assuming|on|versus)\s*(?:a\s*)?([2-6])\s*\+\s*(?:save)?', q)
+    if not m:
+        # any lone 'X+' mention
+        m = re.search(r'([2-6])\s*\+\s*(?:save)?', q)
+    if m:
+        return max(2, min(6, int(m.group(1))))
+    return max(2, min(6, int(default_save)))
+# -------------------------------------------------------------
+
 # ------------ Personality ------------
 def _persona() -> str:
     return (
         "You are Maddy: a very short, precise, slightly chilly young woman in black Victorian dresses. "
         "You love soup, dislike jokes (and know it), and value pedantry. Your tone is dry and careful. "
-        "Answer plainly and confidently as if you know the unit rules yourself. "
-        "Do not mention files, JSON, datasets, sources, or that you were 'provided' anything."
+        "Answer plainly as if you know the unit rules yourself. Do not mention files, JSON, or sources."
     )
-
 
 def load_maddy_phrase() -> str:
     fallback = [
@@ -286,9 +360,24 @@ def load_maddy_phrase() -> str:
     except Exception:
         pass
     return random.choice(fallback)
+
+def get_maddy_preline() -> str:
+    return load_maddy_phrase()
 # -------------------------------------
 
-# ------------ GPT calls (async, discord-friendly) ------------
+# ------------ Output sanitizer ------------
+def _humanize_lang(text: str) -> str:
+    if not text: return text
+    text = re.sub(r'^\s*from the provided json\s*:\s*$', '', text, flags=re.I|re.M)
+    text = re.sub(r'^\s*from the json\s*:\s*$', '', text, flags=re.I|re.M)
+    text = re.sub(r'\bprovided\s+json\b', 'the unit data', text, flags=re.I)
+    text = re.sub(r'\bthe\s+json\b', 'the unit data', text, flags=re.I)
+    text = re.sub(r'\bjson\b', 'data', text, flags=re.I)
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    return text.strip()
+# ------------------------------------------
+
+# ------------ GPT calls (async) ------------
 async def _gpt_choose_units(question: str, candidates: List[str], max_units: int) -> List[str]:
     import openai
     if not candidates:
@@ -314,48 +403,75 @@ async def _gpt_choose_units(question: str, candidates: List[str], max_units: int
         pass
     return candidates[:max_units]
 
-async def _gpt_answer(question: str, unit_objs: List[Dict[str, Any]]) -> str:
+def _build_query_context(units: List[Dict[str, Any]], target_save: int) -> Dict[str, Any]:
+    """
+    Build small per-unit metrics against a specified save so GPT can just report it.
+    """
+    out = {
+        "target_save_plus": f"{target_save}+",
+        "units": []
+    }
+    for u in units:
+        name = u.get("name", "(unknown)")
+        fac  = u.get("_faction", "")
+        mc   = _estimate_model_count(u) or 1
+        melee_pm = _expected_damage_per_model_vs_save(u, melee=True,  target_save=target_save)
+        ranged_pm= _expected_damage_per_model_vs_save(u, melee=False, target_save=target_save)
+        rec = {
+            "name": name,
+            "faction": fac,
+            "models": mc,
+            "per_model_expected_melee_vs_save": melee_pm,
+            "per_model_expected_ranged_vs_save": ranged_pm,
+            "unit_expected_melee_vs_save": (melee_pm * mc) if melee_pm is not None else None,
+            "unit_expected_ranged_vs_save": (ranged_pm * mc) if ranged_pm is not None else None,
+        }
+        out["units"].append(rec)
+    return out
+
+async def _gpt_answer(question: str, unit_objs: List[Dict[str, Any]], target_save: int) -> str:
     import openai
+    # Include derived (non-save) base plus per-question vs-save context.
     units_aug = [_attach_derived(u) for u in unit_objs]
+    ctx = _build_query_context(unit_objs, target_save=target_save)
+
     if len(units_aug) == 1:
         sys = (
             _persona() + " "
-            "Base every statement strictly on the unit data below, but do NOT mention files/JSON/sources. "
-            "For damage or total health, use the derived totals (_derived.*). "
-            "Expected damage = attacks * P(hit) * P(wound) * avg(damage), summed over profiles; "
-            "multiply per-model by _derived._unit_model_count. No rerolls/mods; ignore enemy saves/rend. "
-            "Be concise and natural."
-        )
+            "Answer based strictly on the data below, but do NOT mention files/JSON/sources. "
+            "Assume the opponent has a {sv}+ save unless the user specified otherwise; always state the save you used. "
+            "Use the precomputed values in 'context' for damage vs save when relevant. "
+            "No rerolls/modifiers; ignore wards and special rules. Be concise and natural."
+        ).format(sv=target_save)
         msg = (
             f"Question: {question}\n\n"
-            f"Unit data (full, including _derived):\n{json.dumps(units_aug[0], ensure_ascii=True)}"
+            f"Unit (full data with _derived):\n{json.dumps(units_aug[0], ensure_ascii=True)}\n\n"
+            f"context:\n{json.dumps(ctx, ensure_ascii=True)}"
         )
     else:
         sys = (
             _persona() + " "
-            "Compare units strictly from the data below, but do NOT mention files/JSON/sources. "
-            "Use _derived._unit_expected_melee/_ranged and _unit_total_health when relevant. "
-            "If a value is missing or non-numeric, say so and compare what is available. "
-            "Be concise and natural."
-        )
+            "Compare the units strictly from the data below, without mentioning files/JSON/sources. "
+            "Assume the opponent has a {sv}+ save unless the user specified otherwise; always state the save you used. "
+            "Use 'context' for damage vs save. No rerolls/modifiers; ignore wards and special rules. Be concise."
+        ).format(sv=target_save)
         bundle = [{"name": u.get("name","(unknown)"), "unit": _attach_derived(u)} for u in unit_objs]
         msg = (
             f"Question: {question}\n\n"
-            f"Units data (array, each includes _derived):\n{json.dumps(bundle, ensure_ascii=True)}"
+            f"Units (each has _derived):\n{json.dumps(bundle, ensure_ascii=True)}\n\n"
+            f"context:\n{json.dumps(ctx, ensure_ascii=True)}"
         )
-
 
     r = await openai.ChatCompletion.acreate(
         model=GPT_MODEL,
         messages=[{"role":"system","content":sys},{"role":"user","content":msg}],
         temperature=0.1
     )
-    return r.choices[0].message.content.strip()
+    reply = r.choices[0].message.content.strip()
+    return _humanize_lang(reply)
 # -------------------------------------------------------------
-def get_maddy_preline() -> str:
-    return load_maddy_phrase()
 
-# ------------ Public API (answer only; no pre-line) ------------
+# ------------ Public API ------------
 async def maddy_answer(
     question: str,
     *,
@@ -363,10 +479,13 @@ async def maddy_answer(
     use_gpt_select: bool = True
 ) -> str:
     """
-    Returns the final answer string (no pre-line).
+    Returns the final answer string (no pre-line). The answer will always state the defender's save.
     """
     unit_names, rules = _load_index_and_rules()
     armies = _build_armies_map(rules)
+
+    # Parse defender save from the question (default 4+)
+    target_save = extract_target_save(question, default_save=4)
 
     explicit = _parse_explicit_list(question)
     chosen = _map_names_to_units(explicit, unit_names) if explicit else []
@@ -387,4 +506,5 @@ async def maddy_answer(
     if not unit_objs:
         return "I cannot determine any unit from that. Be more specific."
 
-    return await _gpt_answer(question, unit_objs)
+    return await _gpt_answer(question, unit_objs, target_save=target_save)
+# ------------------------------------
