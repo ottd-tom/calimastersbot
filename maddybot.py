@@ -57,7 +57,20 @@ def _prob_x_plus(token: Any) -> Optional[float]:
     if not m: return None
     x = int(m.group(1))
     return max(0.0, min(1.0, (7 - x) / 6.0))
-# -------------------------------------
+
+
+def _is_combat_related(question: str) -> bool:
+    """
+    Returns True if the question involves attacks, damage, hits, wounds, rend, saves, or comparisons of hitting power.
+    """
+    qn = question.lower()
+    combat_terms = [
+        "attack", "attacks", "damage", "dmg", "hit", "hits", "wound", "wounds",
+        "rend", "save", "toughness", "kill", "kills", "stronger", "weaker", "fight",
+        "melee", "shoot", "ranged", "weapon", "hurt", "strike"
+    ]
+    return any(t in qn for t in combat_terms)
+
 
 # ------------ Data load (cached) ------------
 _CACHE = {
@@ -571,32 +584,32 @@ async def _gpt_answer(question: str, unit_objs: List[Dict[str, Any]], target_sav
     units_aug = [_attach_derived(u) for u in unit_objs]
     ctx = _build_query_context(unit_objs, target_save=target_save)
 
+    is_combat = _is_combat_related(question)
+    
     if len(units_aug) == 1:
         sys = (
-            _persona() + " "
-            "Answer based strictly on the data below, but do NOT mention files/JSON/sources. "
-            "Assume the opponent has a {sv}+ save unless the user specified otherwise; always state the save you used. "
-            "Use the precomputed values in 'context' for damage vs save when relevant. "
-            "No rerolls/modifiers; ignore wards and special rules. Be concise and natural."
-        ).format(sv=target_save)
+            _persona()
+            + " Base every statement strictly on the unit data below, but do NOT mention files/JSON/sources. "
+        )
+        if is_combat:
+            sys += (
+                f"For damage or total health, use the derived totals (_derived.*). "
+                f"Expected damage calculations use the target save of {target_save}+. "
+            )
         msg = (
             f"Question: {question}\n\n"
-            f"Unit (full data with _derived):\n{json.dumps(units_aug[0], ensure_ascii=True)}\n\n"
-            f"context:\n{json.dumps(ctx, ensure_ascii=True)}"
+            f"Unit data (full, including _derived):\n{json.dumps(units_aug[0], ensure_ascii=True)}"
         )
     else:
         sys = (
-            _persona() + " "
-            "Compare the units strictly from the data below, without mentioning files/JSON/sources. "
-            "Assume the opponent has a {sv}+ save unless the user specified otherwise; always state the save you used. "
-            "Use 'context' for damage vs save. No rerolls/modifiers; ignore wards and special rules. Be concise."
-        ).format(sv=target_save)
-        bundle = [{"name": u.get("name","(unknown)"), "unit": _attach_derived(u)} for u in unit_objs]
-        msg = (
-            f"Question: {question}\n\n"
-            f"Units (each has _derived):\n{json.dumps(bundle, ensure_ascii=True)}\n\n"
-            f"context:\n{json.dumps(ctx, ensure_ascii=True)}"
+            _persona()
+            + " Compare the following units strictly from the data below. "
         )
+        if is_combat:
+            sys += f"Use target save {target_save}+ when computing expected damage.\n"
+        bundle = [{"name": u.get("name","(unknown)"), "unit": _attach_derived(u)} for u in unit_objs]
+        msg = f"Question: {question}\n\nUnits data (array):\n{json.dumps(bundle, ensure_ascii=True)}"
+
 
     r = await openai.ChatCompletion.acreate(
         model=GPT_MODEL,
@@ -604,7 +617,11 @@ async def _gpt_answer(question: str, unit_objs: List[Dict[str, Any]], target_sav
         temperature=0.1
     )
     reply = r.choices[0].message.content.strip()
-    return _humanize_lang(reply)
+    reply = _humanize_lang(reply)
+    if is_combat and f"{target_save}+" not in reply:
+        reply += f"\n\n(Assuming target save of {target_save}+.)"
+    return reply
+
 # -------------------------------------------------------------
 
 # ------------ Public API ------------
