@@ -339,50 +339,39 @@ async def _gpt_answer(question: str, unit_objs: List[Dict[str, Any]]) -> str:
     )
     return r.choices[0].message.content.strip()
 # -------------------------------------------------------------
+def get_maddy_preline() -> str:
+    return load_maddy_phrase()
 
-# ------------ Public API ------------
+# ------------ Public API (answer only; no pre-line) ------------
 async def maddy_answer(
     question: str,
     *,
     max_units: int = DEFAULT_MAX_UNITS,
     use_gpt_select: bool = True
-) -> Dict[str, str]:
+) -> str:
     """
-    Returns dict:
-      {
-        'preline': str,     # line to show immediately
-        'answer':  str      # final GPT answer
-      }
+    Returns the final answer string (no pre-line).
     """
     unit_names, rules = _load_index_and_rules()
     armies = _build_armies_map(rules)
 
-    # choose units
     explicit = _parse_explicit_list(question)
     chosen = _map_names_to_units(explicit, unit_names) if explicit else []
 
     if not chosen:
         if use_gpt_select:
-            # Take a small local pool, then ask GPT to pick
             local_cands = _local_top_candidates(question, unit_names, k=max(TOP_K, max_units))
             chosen = await _gpt_choose_units(question, local_cands, max_units=max_units)
         else:
             chosen = _local_top_candidates(question, unit_names, k=max_units)
 
-    # resolve to full objects
     unit_objs: List[Dict[str, Any]] = []
     for name in chosen:
         obj = _get_unit_object(name, armies)
-        if obj: unit_objs.append(obj)
+        if obj:
+            unit_objs.append(obj)
 
     if not unit_objs:
-        return {
-            "preline": load_maddy_phrase(),
-            "answer": "I cannot determine any unit from that. Be more specific."
-        }
+        return "I cannot determine any unit from that. Be more specific."
 
-    # Compose answer
-    pre = load_maddy_phrase()
-    ans = await _gpt_answer(question, unit_objs)
-    return {"preline": pre, "answer": ans}
-# ------------------------------------
+    return await _gpt_answer(question, unit_objs)
