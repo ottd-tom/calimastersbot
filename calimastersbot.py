@@ -1467,125 +1467,6 @@ def make_everyone_bald(api_key: str, image_path: str, output_path: str):
                             print(f"Additional API text feedback: {part.text}")
         raise Exception(f"Failed to get image from Gemini API: {e}")
 
-RAW_BASE_URL = "https://raw.githubusercontent.com/ottd-tom/calimastersbot/main/photos"
-from tombot_context_manual import get_manual_context_gpt
-@aos_bot.command(name='tombot', help='Ask a question about the OTTD Teams event pack.')
-async def tombot_cmd(ctx, *, question: str):
-    allowed_guild_ids = [1258302667403563118, 940470229732032583, 880232727159406642]
-    if ctx.guild is None or ctx.guild.id not in allowed_guild_ids:
-        return await ctx.send(
-            "Do you really think this server is worthy of tombot? "
-            "You need to head to the OTTD discord: https://discord.com/invite/Fqeda4qVW8"
-        )
-
-    # Special case: share a memory
-    if question.strip().lower() == "share a memory":
-        try:
-            img_path = pick_random_photo()
-        except FileNotFoundError:
-            return await ctx.send("Sorry, I have no memories to share…")
-
-        # Build GitHub raw URL
-        filename = img_path.name
-        raw_url = f"{RAW_BASE_URL}/{quote(filename)}"
-
-        # Send to GPT-4 Vision via URL embed
-        try:
-            vision_resp = await openai.ChatCompletion.acreate(
-                model="gpt-4o-mini",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": (
-                            "You are TomBot, a rude and sarcastic Discord bot for the Old Town Throwdown Age of Sigmar Teams event. "
-                            "You are shown a photo from a past Old Town Throwdown. Roast it in one or two punchy sentences."
-                        )
-                    },
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "image_url", "image_url": {"url": raw_url}}
-                        ]
-                    }
-                ],
-                temperature=0.9,
-                max_tokens=100,
-            )
-            roast = vision_resp.choices[0].message.content.strip()
-        except Exception as e:
-            print("Vision API error:", repr(e))
-            roast = "I can’t even make fun of this—it's on a whole other level of bad."
-
-        # Send roast + attach local image
-        return await ctx.send(roast, file=discord.File(img_path))
-
-    if question.strip().lower().startswith("weirdize a memory"):
-        try:
-            img_path = pick_random_photo()
-        except FileNotFoundError:
-            return await ctx.send("Sorry, I have no memories to share…")
-    
-        styles = ["cartoon", "muppets", "anime", "simpsons"]
-        style = random.choice(styles)
-        output_path = PHOTO_DIR / f"styled_{style}_{img_path.name}"
-    
-        try:
-            apply_gemini_style(
-                api_key=GEMINI_API_KEY,
-                image_path=str(img_path),
-                style=style,
-                output_path=str(output_path)
-            )
-        except Exception as e:
-            print("Gemini styling error:", e)
-            return await ctx.send(f"Styling failed: {e}")
-    
-        message = await ctx.send(
-            f"Here’s a {style}-style twist alongside the original memory:",
-            files=[discord.File(output_path), discord.File(img_path)]
-        )
-        try:
-            os.remove(output_path)
-        except OSError:
-            pass
-        return message
-    
-    # Regular OTTD Q&A flow
-    topic, context = get_manual_context_gpt(question, openai)
-
-    if topic == "players":
-        system_prompt = (
-            "You are TomBot, a rude and sarcastic Discord bot for the 'Old Town Throwdown Teams' event. "
-           # "You have access to past player stats. Use this info to make predictions, talk smack, and show off. "
-            "Be short, rude, and overly confident in your judgments. Here's what you know:\n\n" + context
-        )
-    else:
-        system_prompt = (
-            "You are TomBot, a rude, sassy and sarcastic Discord bot for the Age of Sigmar team event 'Old Town Throwdown Teams'. "
-            "You always answer questions clearly using event details provided to you (the user does not see them). "
-            "You hate dumb questions and love being snarky, but never complain about the information — just use it. "
-            "Event info:\n\n" + context
-        )
-
-    user_prompt = (
-        "Pretend you’re talking to someone who just walked up and asked a really obvious, annoying question about 'Old Town Throwdown: Teams'. "
-        "Your job is to give them the answer, but also roast them for wasting your time.\n\n"
-        f"Question:\n{question}"
-    )
-
-    try:
-        response = await openai.ChatCompletion.acreate(
-            model="gpt-4",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            temperature=0.5,
-        )
-        reply = response.choices[0].message.content
-        await ctx.send(reply[:2000])
-    except Exception as e:
-        await ctx.send(f"Error: {e}")
 
 
 SCION_BASE_URL = "https://raw.githubusercontent.com/ottd-tom/calimastersbot/main/scionphotos"
@@ -1705,6 +1586,7 @@ async def scionbot_cmd(ctx, *, question: str):
 
 import random
 from discord.ext import commands
+from maddybot import maddy_answer
 
 maddy_phrases = [
     "I'm cold.",
@@ -1746,10 +1628,24 @@ maddy_phrases = [
     "As a child, I was not fortunate enough to have stuffed animals."
 ]
 
-@aos_bot.command(name='maddybot', help='Get your AoS Questions answered')
-async def maddybot_cmd(ctx):
-    phrase = random.choice(maddy_phrases)
-    await ctx.send(phrase)
+@aos_bot.command(name='maddybot', help='Ask Maddy an AoS unit question, or get a phrase if no question is given.')
+async def maddybot_cmd(ctx, *, question: str = None):
+    # No-arg behavior: keep your existing “phrase” response
+    if not question or not question.strip():
+        phrase = random.choice(maddy_phrases)  # your existing list
+        return await ctx.send(phrase)
+
+    # With a question: use Maddy’s unit Q&A
+    try:
+        # Show preline immediately (no network call yet)
+        res = await maddy_answer(question.strip(), max_units=5, use_gpt_select=True)
+        # Send pre-line as a separate message so it appears quickly
+        await ctx.send(res["preline"])
+        # Then the final answer
+        reply = truncate_content(res["answer"], max_len=1900)  # reuse your helper
+        await ctx.send(reply if reply.strip() else "…unsatisfying silence. (No content returned.)")
+    except Exception as e:
+        await ctx.send(f":x: Maddy failed to answer: {e}")
 
 SUN_TZU_AOS_STRAT = """
 In Age of Sigmar, the principle Know yourself and know your enemy is as vital at the gaming table as it was on ancient battlefields. Before even rolling dice, a commander must understand the strengths and limitations of their chosen Host—whether the stoic resilience of the Stormcast Eternals, the untamed ferocity of the Kruleboyz, or the arcane versatility of the Idoneth Deepkin. Sun Tzu teaches that thorough preparation and self‐assessment secure victory: in Age of Sigmar terms, this means building a list that leverages synergies between units, abilities, and artifacts while anticipating the threats posed by common tournament archetypes. Likewise, scouting the opponent’s likely composition—and adapting your own to counter it—mirrors Sun Tzu’s emphasis on flexibility: be like water, fitting your deployment to the contours of the battlefield and the flow of the game. Victory arises not from brute force alone, but from the harmony of strategy, list construction, and foresight.
