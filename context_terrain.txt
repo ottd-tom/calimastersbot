@@ -1,6 +1,0 @@
-Each battleplan will use terrain maps from the General’s Handbook.
-
-Note that we will change Unstable to:
-
-
-Models cannot move across,  be set up on, or end any type of move on any part of this terrain feature that is more than 1” tall.
