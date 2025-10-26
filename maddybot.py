@@ -172,71 +172,61 @@ def _contains_whole_word(hay: str, needle: str) -> bool:
 
 def _smart_detect_units(question: str, unit_names: list[str], aliases: dict[str, list[str]]) -> tuple[list[str], Optional[str]]:
     """
-    Try to resolve units purely from user text via:
-      1) exact unit name in question (whole-word, case-insensitive)
-      2) alias hits (whole-word; may map to 1+ units)
-      3) partial name hits from significant tokens (>=4 chars)
-    Rules:
-      - If an exact unit name is present → return that/those (exact beats partial).
-      - If a partial hit maps to multiple units and NO exact match exists → ambiguous.
-      - If both exact and partial are present → keep exact only.
-    Returns (units, error_msg). error_msg is None if resolved; non-None if ambiguous.
+    Resolution order:
+      A) Exact unit name appears as a whole word in the question -> return those (can be multiple).
+      B) Alias matches (whole-word) -> return alias targets (can be multiple).
+      C) Clean partials:
+         - If a question token (>=5 chars) equals the *start* of a unit name word
+           or equals a whole unit name word -> count it.
+         - If exactly one unit matches -> return it.
+         - If multiple -> ambiguous.
+      D) If no hits -> [] (let caller decide to try fuzzy).
     """
     qn = _normalize(question)
+    q_tokens = qn.split()
 
-    # 1) exact unit hits
+    # A) Exact whole-name hit
     exact_hits: list[str] = []
     for u in unit_names:
         un = _normalize(u)
         if _contains_whole_word(qn, un):
             exact_hits.append(u)
-
     if exact_hits:
-        # If exact(s) found, prefer them exclusively
         return sorted(set(exact_hits)), None
 
-    # 2) alias hits (whole-word)
+    # B) Aliases (whole-word)
     alias_hits: list[str] = []
     for a, targets in aliases.items():
         if _contains_whole_word(qn, a):
             alias_hits.extend(targets)
     alias_hits = sorted(set(alias_hits))
-
     if alias_hits:
-        # If alias resolves to >1 distinct unit, that's okay (could be comparison questions)
         return alias_hits, None
 
-    # 3) partial name search using significant tokens from the question
-    #    Take tokens >= 4 chars (to avoid matching common words)
-    toks = [t for t in qn.split() if len(t) >= 4]
-    partial_hits: list[str] = []
+    # C) Clean partials using stricter token rule
+    #    use tokens >=5 chars to reduce collisions (e.g., chaos vs kairos)
+    sig = [t for t in q_tokens if len(t) >= 5]
+    if not sig:
+        return [], None
 
+    partial_hits: set[str] = set()
     for u in unit_names:
         un = _normalize(u)
-        # if ANY significant token appears as a whole word within the unit name
-        # or the token is a prefix of the unit, count it as a hit
-        for t in toks:
-            if _contains_whole_word(un, t) or un.startswith(t + " "):
-                partial_hits.append(u)
+        words = un.split()
+        for t in sig:
+            # match whole word OR word-prefix (e.g., 'kairos' -> 'kairos fateweaver')
+            if t in words or any(w.startswith(t) for w in words):
+                partial_hits.add(u)
                 break
 
-    partial_hits = sorted(set(partial_hits))
-
     if not partial_hits:
-        return [], None  # nothing found here
-
-    # If exactly 1 partial match -> good.
+        return [], None
     if len(partial_hits) == 1:
-        return partial_hits, None
+        return [next(iter(partial_hits))], None
 
-    # Special exact-preference rule for cases like "Karanak" vs "Claws of Karanak":
-    # If user's text contains a whole word that exactly equals any unit's normalized full name, choose it.
-    for u in partial_hits:
-        if _contains_whole_word(qn, _normalize(u)):
-            return [u], None
+    # D) Ambiguous partials
+    return [], f"That name is ambiguous. Did you mean: {', '.join(sorted(list(partial_hits))[:6])}?"
 
-    # Multiple partial matches and no exact match -> ambiguous
-    return [], f"That name is ambiguous. Did you mean: {', '.join(partial_hits[:6])}?"
 
 
 
@@ -270,9 +260,36 @@ def _score_against_question(name: str, qnorm: str) -> float:
 
 def _local_top_candidates(question: str, unit_names: List[str], k: int) -> List[str]:
     qn = _normalize(question)
-    scored = [(n, _score_against_question(n, qn)) for n in unit_names]
+    q_tokens = qn.split()
+    sig = {t for t in q_tokens if len(t) >= 5}
+
+    def token_overlap(uname_norm: str) -> bool:
+        if not sig:  # if no strong tokens, allow overlap-free (rare)
+            return True
+        w = set(uname_norm.split())
+        # unit includes a strong token as word or the unit has a word that starts with it
+        if w & sig:
+            return True
+        for t in sig:
+            if any(uw.startswith(t) for uw in w):
+                return True
+        return False
+
+    scored: List[tuple[str, float]] = []
+    for n in unit_names:
+        un = _normalize(n)
+        if not token_overlap(un):
+            continue
+        s = _score_against_question(n, qn)
+        scored.append((n, s))
+
+    if not scored:
+        # as a last resort, keep old behavior
+        scored = [(n, _score_against_question(n, qn)) for n in unit_names]
+
     scored.sort(key=lambda x: x[1], reverse=True)
     return [n for n,_ in scored[:k]]
+
 
 def _parse_explicit_list(question: str) -> List[str]:
     if ":" not in question: return []
