@@ -63,29 +63,16 @@ async def noog_answer(target: discord.Message) -> Optional[str]:
         f"TEXT:\n{prev_text}"
     )
 
-    # Call OpenAI depending on SDK
-    if _USE_NEW_SDK:
-        resp = await _openai_client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            temperature=0.9,
-            max_tokens=200,
-        )
-        reply = (resp.choices[0].message.content or "").strip()
-    else:
-        # Legacy SDK path
-        resp = await openai.ChatCompletion.acreate(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            temperature=0.9,
-            max_tokens=200,
-        )
-        reply = (resp.choices[0].message["content"] or "").strip()
+
+    resp = await openai.ChatCompletion.acreate(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        temperature=0.9,
+        max_tokens=200,
+    )
+    reply = (resp.choices[0].message["content"] or "").strip()
 
     return reply or None
