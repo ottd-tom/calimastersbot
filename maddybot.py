@@ -444,4 +444,7 @@ async def maddy_answer(question: str, *, max_units: int = DEFAULT_MAX_UNITS, use
         if u: unit_objs.append(u)
 
     if not unit_objs:
-        return "I cannot determine any unit from that. Be more specific
+        return "I cannot determine any unit from that. Be more specific."
+
+    # Ask GPT to answer using the attached derived stats (and full unit payload)
+    return await _gpt_answer(question, unit_objs, target_save)
