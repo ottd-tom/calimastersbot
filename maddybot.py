@@ -208,6 +208,64 @@ def _smart_detect_units(question: str, unit_names: list[str], aliases: dict[str,
 
 
 # ===============================================
+# --------- COMPARISON-AWARE RESOLUTION ---------
+# ===============================================
+
+def _split_compare_chunks(question: str) -> List[str]:
+    """
+    Split questions like 'A or B', 'A vs B', 'A, B, C' into meaningful chunks.
+    Returns normalized, non-empty chunks.
+    """
+    q = question.strip()
+    parts = re.split(r'\b(?:vs|versus|against|or)\b|[,/]', q, flags=re.IGNORECASE)
+    chunks = []
+    for p in parts:
+        n = _normalize(p)
+        if n:
+            chunks.append(n)
+    return chunks
+
+def _best_match_for_chunk(chunk_norm: str, unit_names: List[str]) -> Optional[str]:
+    """
+    For a chunk like 'archaon' or 'skarbrand', pick the single best unit.
+    Prefers exact word-in-name hits; otherwise falls back to overall similarity.
+    """
+    candidates: List[str] = []
+    for u in unit_names:
+        un = _normalize(u)
+        if _contains_whole_word(un, chunk_norm):
+            candidates.append(u)
+
+    if candidates:
+        return max(candidates, key=lambda n: difflib.SequenceMatcher(a=_normalize(n), b=chunk_norm).ratio())
+
+    best, best_s = None, 0.0
+    for u in unit_names:
+        s = difflib.SequenceMatcher(a=_normalize(u), b=chunk_norm).ratio()
+        if s > best_s:
+            best_s, best = s, u
+    return best
+
+def _resolve_units_from_conjunctions(question: str, unit_names: List[str]) -> List[str]:
+    """
+    If the question looks like a comparison ('X or Y', 'X vs Y', 'A, B, C'),
+    resolve each chunk separately and return the distinct unit names found.
+    """
+    chunks = _split_compare_chunks(question)
+    if len(chunks) < 2:
+        return []
+
+    resolved: List[str] = []
+    seen = set()
+    for ch in chunks:
+        hit = _best_match_for_chunk(ch, unit_names)
+        if hit and hit not in seen:
+            resolved.append(hit)
+            seen.add(hit)
+    return resolved if len(resolved) >= 2 else []
+
+
+# ===============================================
 # ---------------- COMBAT STATS -----------------
 # ===============================================
 
@@ -236,16 +294,13 @@ def _collect_all_weapons(unit: dict) -> List[dict]:
             unique.append(w)
     return unique
 
-
 def _expected_damage_vs_save(unit: dict, target_save: int = 4) -> float:
     """Expected damage for a full unit vs a given save."""
     def avg_dice(val):
         return _avg_dice(str(val)) or _parse_numeric_unsigned(val) or 0.0
-
     def p_success(s):
         m = _prob_x_plus(s)
         return m if m is not None else 0.0
-
     def parse_rend(s):
         v = _parse_numeric_signed(s)
         return v if v is not None else 0.0
@@ -272,7 +327,6 @@ def _expected_damage_vs_save(unit: dict, target_save: int = 4) -> float:
         total += atk * ph * pw * p_unsaved * dmg
 
     return round(total * model_count, 2)
-
 
 def _attach_derived(unit: dict, target_save: int = 4) -> dict:
     import copy
@@ -375,7 +429,6 @@ async def _gpt_choose_units(question: str, candidates: List[str], max_units: int
         pass
     return candidates[:max_units]
 
-
 async def _gpt_answer(question: str, unit_objs: List[Dict[str, Any]], target_save: int) -> str:
     import openai
     units_aug = [_attach_derived(u, target_save) for u in unit_objs]
@@ -407,41 +460,71 @@ async def _gpt_answer(question: str, unit_objs: List[Dict[str, Any]], target_sav
 # ---------------- PUBLIC ENTRY -----------------
 # ===============================================
 
-async def maddy_answer(question: str, *, max_units: int = DEFAULT_MAX_UNITS, use_gpt_select: bool = True) -> str:
+async def maddy_answer(
+    question: str,
+    *,
+    max_units: int = DEFAULT_MAX_UNITS,
+    use_gpt_select: bool = True
+) -> str:
+    """
+    Resolve unit(s) from the user's question (comparison-aware, exact > alias > partial),
+    detect/assume a defender save (default 4+), and return Maddy's final answer.
+    If a partial name is ambiguous (and no exact match exists), returns a short disambiguation string.
+    """
     unit_names, rules = _load_index_and_rules()
     armies = _build_armies_map(rules)
     target_save = extract_target_save(question, 4)
 
-    explicit = []
-    if ":" in question:
+    chosen: List[str] = []
+
+    # 0) Comparison-aware pre-pass: handle "A or B", "A vs B", "A, B"
+    conj_units = _resolve_units_from_conjunctions(question, unit_names)
+    if conj_units:
+        chosen = conj_units
+
+    # 1) Explicit "list:" style block (e.g., "Which of the following units has the highest...:\nX\nY\nZ")
+    if not chosen and ":" in question:
         after = question.split(":", 1)[1]
         explicit = [_normalize(x) for x in after.splitlines() if _normalize(x)]
+        if explicit:
+            for raw in explicit:
+                best = max(
+                    unit_names,
+                    key=lambda n: difflib.SequenceMatcher(a=_normalize(n), b=raw).ratio(),
+                    default=None
+                )
+                if best and best not in chosen:
+                    chosen.append(best)
 
-    chosen = []
-    if explicit:
-        for raw in explicit:
-            best = max(unit_names, key=lambda n: difflib.SequenceMatcher(a=_normalize(n), b=raw).ratio(), default=None)
-            if best: chosen.append(best)
-
+    # 2) Smart detection (exact/alias/partial tokens)
     if not chosen:
         aliases = _get_aliases()
         smart, err = _smart_detect_units(question, unit_names, aliases)
-        if err: return err
+        if err:
+            return err
         chosen = smart
 
+    # 3) Fallback to fuzzy or GPT pruning
     if not chosen:
         if use_gpt_select:
-            local_cands = sorted(unit_names, key=lambda n: difflib.SequenceMatcher(a=_normalize(n), b=_normalize(question)).ratio(), reverse=True)[:max(TOP_K, max_units)]
-            chosen = await _gpt_choose_units(question, local_cands, max_units)
+            scored = sorted(
+                unit_names,
+                key=lambda n: difflib.SequenceMatcher(a=_normalize(n), b=_normalize(question)).ratio(),
+                reverse=True
+            )[:max(TOP_K, max_units)]
+            chosen = await _gpt_choose_units(question, scored, max_units)
         else:
             chosen = unit_names[:max_units]
 
+    # De-dupe and cap
     chosen = list(dict.fromkeys(chosen))[:max_units]
 
-    unit_objs = []
+    # Resolve to unit objects
+    unit_objs: List[Dict[str, Any]] = []
     for n in chosen:
         u = _get_unit_object(n, armies)
-        if u: unit_objs.append(u)
+        if u:
+            unit_objs.append(u)
 
     if not unit_objs:
         return "I cannot determine any unit from that. Be more specific."
