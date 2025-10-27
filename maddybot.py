@@ -294,8 +294,31 @@ def _collect_all_weapons(unit: dict) -> List[dict]:
             unique.append(w)
     return unique
 
+def _weapon_crit_flags(prof: dict) -> tuple[bool, bool, bool]:
+    """
+    Return (crit_mortal, crit_auto_wound, crit_two_hits) for a weapon profile.
+    Looks for strings like 'Crit (Mortal)', 'Crit (Auto-wound)', 'Crit (2 Hits)' in prof['abilities'].
+    """
+    abilities = prof.get("abilities") or []
+    if isinstance(abilities, dict):  # very defensive
+        abilities = list(abilities.values())
+    text = " | ".join(str(a) for a in abilities).lower()
+
+    crit_mortal = bool(re.search(r'\bcrit\b.*\bmortal', text))
+    crit_auto   = bool(re.search(r'\bcrit\b.*\bauto[- ]?wound', text))
+    crit_2hits  = bool(re.search(r'\bcrit\b.*\b2\s*hits?', text))
+
+    # tolerate exact tokens too
+    tokens = {str(a).strip().lower() for a in (abilities if isinstance(abilities, list) else [])}
+    crit_mortal = crit_mortal or ("crit (mortal)" in tokens) or ("crit (mortal wounds)" in tokens)
+    crit_auto   = crit_auto   or ("crit (auto-wound)" in tokens) or ("crit (auto wound)" in tokens)
+    crit_2hits  = crit_2hits  or ("crit (2 hits)" in tokens) or ("crit (two hits)" in tokens)
+
+    return crit_mortal, crit_auto, crit_2hits
+
+
 def _expected_damage_vs_save(unit: dict, target_save: int = 4) -> float:
-    """Expected damage for a full unit vs a given save."""
+    """Expected damage for a full unit vs a given save, including Crit rules."""
     def avg_dice(val):
         return _avg_dice(str(val)) or _parse_numeric_unsigned(val) or 0.0
     def p_success(s):
@@ -307,26 +330,68 @@ def _expected_damage_vs_save(unit: dict, target_save: int = 4) -> float:
 
     all_weapons = _collect_all_weapons(unit)
     total = 0.0
+
+    # models in the unit (max is the unit size in your blob)
     model_count = 1
     try:
         model_count = int(unit.get("models", [{}])[0].get("max", 1))
     except Exception:
         pass
 
+    # clamp defender save to 2..6
+    base_sv = max(2, min(6, int(target_save)))
+
     for w in all_weapons:
         atk = avg_dice(w.get("attack"))
         dmg = avg_dice(w.get("damage"))
-        ph = p_success(w.get("hit"))
-        pw = p_success(w.get("wound"))
+        ph  = p_success(w.get("hit"))
+        pw  = p_success(w.get("wound"))
         rend = parse_rend(w.get("rend"))
 
-        eff = target_save - int(round(rend))
-        eff = min(7, max(2, eff))
-        p_save = (7 - eff) / 6.0 if 2 <= eff <= 6 else (5.0 / 6.0 if eff < 2 else 0.0)
+        # effective save after rend (AoS: reduce the save value by rend)
+        eff = base_sv - int(round(rend))
+        if eff < 2:
+            p_save = 5.0 / 6.0
+        elif eff <= 6:
+            p_save = (7 - eff) / 6.0
+        else:
+            p_save = 0.0
         p_unsaved = 1.0 - p_save
-        total += atk * ph * pw * p_unsaved * dmg
+
+        # --- Crit flags ---
+        crit_mortal, crit_auto, crit_two_hits = _weapon_crit_flags(w)
+
+        # --- Split hits into crit vs non-crit ---
+        # unmodified 6 always qualifies as a hit if to-hit <= 6, so P(crit)=1/6 in practice
+        # (and 0 if the weapon can't hit on a 6 for some reason)
+        p_crit = 1.0 / 6.0 if ph > 0 else 0.0
+        # don't exceed total hit probability
+        p_noncrit = max(0.0, ph - p_crit)
+
+        # --- Non-crit contribution (normal pipeline: hit -> wound -> save -> damage) ---
+        e_noncrit = atk * p_noncrit * pw * p_unsaved * dmg
+
+        # --- Crit base contribution depends on effect ---
+        if crit_mortal:
+            # mortal wounds: skip wound & save, deal straight damage
+            e_crit_base = atk * p_crit * dmg
+        elif crit_auto:
+            # auto-wound: skip wound but still save
+            e_crit_base = atk * p_crit * p_unsaved * dmg
+        else:
+            # no special crit: just a normal hit that still wounds+saves
+            e_crit_base = atk * p_crit * pw * p_unsaved * dmg
+
+        # --- Crit (2 Hits): each crit generates ONE extra normal hit on top ---
+        # That extra behaves like a normal hit (wound + save)
+        e_crit_extra = 0.0
+        if crit_two_hits:
+            e_crit_extra = atk * p_crit * pw * p_unsaved * dmg
+
+        total += e_noncrit + e_crit_base + e_crit_extra
 
     return round(total * model_count, 2)
+
 
 def _attach_derived(unit: dict, target_save: int = 4) -> dict:
     import copy
