@@ -1794,9 +1794,18 @@ from gpt_people_bots import _get_target_message, noog_answer
     name='noogbot',
     help='Repeat the previous message (or the replied-to message) in a dumb, off-point way.'
 )
-async def noogbot_cmd(ctx):
+async def noogbot_cmd(ctx: commands.Context):
     try:
-        target = noog_answer()
+        target = await _get_target_message(ctx)
+        if not target:
+            await ctx.send(":warning: I could not find a message to mock.")
+            return
+
+        reply = await noog_answer(target)
+        if not reply:
+            await ctx.send(":warning: That message had no readable text.")
+            return
+
         out = truncate_content(reply, max_len=1900)
         await ctx.send(out)
 
