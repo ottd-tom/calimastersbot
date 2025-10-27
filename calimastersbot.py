@@ -1707,13 +1707,6 @@ async def jobot_cmd(ctx):
     phrase = random.choice(jo_phrases)
     await ctx.send(phrase)
 
-tymon_phrases = [
-    "It's ironic to me, I've always been able to relate to military people.\nEven though I'm a Rasta at heart, I've regularly had people ask me if I have been in the military,\nafter seeing me work/perform so systematically.\nAnd although I've never served, I have watched a lot of my close friend die horrific deaths, I've killed a lot of people myself and I'm not a good person.\nI don't care where you lay politically just know that running your mouth might get you touched."
-]
-@aos_bot.command(name='tymonbot', help='Get your AoS Questions answered')
-async def tymon_cmd(ctx):
-    phrase = random.choice(tymon_phrases)
-    await ctx.send(phrase)
 
 tomtom_phrases = [
     "Tom's so smart"
@@ -1731,14 +1724,7 @@ async def tomtomtombot_cmd(ctx):
     phrase = random.choice(tomtomtom_phrases)
     await ctx.send(phrase)
 
-bcpbarker_phrases = [
-    "Hey thanks for reaching out! That’s a great question. Let me get some more info and get back with you soon."
-]
-@aos_bot.command(name='bcpbarkerbot')
-async def bcpbarkbot_cmd(ctx):
-    phrase = random.choice(bcpbarker_phrases)
-    await ctx.send(phrase)
-                 
+
 @aos_bot.command(name="adjudicate")
 async def adjudicate(ctx):
     # Must be used as a reply
