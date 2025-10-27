@@ -76,3 +76,58 @@ async def noog_answer(target: discord.Message) -> Optional[str]:
     reply = (resp.choices[0].message["content"] or "").strip()
 
     return reply or None
+
+
+async def jarjar_answer(target: discord.Message) -> Optional[str]:
+    """
+    Build a jarjar reply
+    Returns the text reply, or None if no readable text.
+    """
+    prev_text = (getattr(target, "content", "") or "").strip()
+
+    # If no text, try a small text attachment.
+    if not prev_text and getattr(target, "attachments", None):
+        for att in target.attachments:
+            if (getattr(att, "size", 0) or 0) <= 200_000 and getattr(att, "content_type", "") and "text" in att.content_type:
+                try:
+                    data = await att.read()
+                    prev_text = data.decode("utf-8", errors="replace")[:4000]
+                    break
+                except Exception:
+                    pass
+
+    if not prev_text:
+        return None
+
+    system_prompt = (
+        "You are JarJarBot. You rewrite messages in a Jar Jar Binks-like voice (Gungan-style speech) "
+        "without quoting or imitating specific lines from the films. Keep outputs short (1-2 sentences), "
+        "slightly confused and off-point. Use plain ASCII only.\n\n"
+        "Style guide:\n"
+        "- Start with \"Meesa\", \"Yousa\", \"Okieday\", or similar sometimes.\n"
+        "- Use Gungan grammar: \"Meesa think\", \"Yousa sayin\", \"Dis\", \"Dat\", \"Bombad\".\n"
+        "- Sprinkle mild Jar Jar-isms: \"How wude!\", \"Uh-oh\", \"mesa clumsy\", but not every time.\n"
+        "- Keep punctuation light; lowercase is ok; a few typos are ok.\n"
+        "- Do not add facts; do not mention Star Wars; no emojis.\n"
+        "- Stay friendly and silly, not insulting or offensive."
+    )
+
+    user_prompt = (
+        "Rewrite the text below so it sounds like a Jar Jar Binks-style take: "
+        "Do not add new info or names. Keep to 1-2 sentences, ASCII only.\n\n"
+        f"TEXT:\n{prev_text}"
+    )
+
+
+    resp = await openai.ChatCompletion.acreate(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        temperature=0.9,
+        max_tokens=200,
+    )
+    reply = (resp.choices[0].message["content"] or "").strip()
+
+    return reply or None
