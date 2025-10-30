@@ -1700,7 +1700,8 @@ async def ebot_cmd(ctx):
     await ctx.send(phrase)
 
 jo_phrases = [
-    "(Not knowing context since I'm at work, so quick response) I love a good pp"
+    "(Not knowing context since I'm at work, so quick response) I love a good pp",
+    "The best thing here. Turns out anal is a cure all"
 ]
 @aos_bot.command(name='jobot', help='Get your AoS Questions answered')
 async def jobot_cmd(ctx):
