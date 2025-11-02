@@ -55,13 +55,17 @@ async def noog_answer(target: discord.Message) -> Optional[str]:
         "- sometimes skip capitalization, "
         "- use occasional typos/autocorrect quirks, "
         "- but keep it natural and not unreadable. "
-        "Avoid sounding like a PC keyboard essay; it should feel quick and mobile-typed."
+        "Avoid sounding like a PC keyboard essay; it should feel quick and mobile-typed. "
+        "Also, try to slip in a tangential side note that you are the assistant Captain "
+        "(or sometimes 'assistant to the Captain') of Team America. Keep that aside short and subtle."
     )
 
     user_prompt = (
         "Rephrase this so it sounds dumber and slightly off the point. Keep it brief.\n\n"
         f"TEXT:\n{prev_text}"
     )
+
+ 
 
 
     resp = await openai.ChatCompletion.acreate(
