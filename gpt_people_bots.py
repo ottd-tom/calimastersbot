@@ -1,6 +1,6 @@
 import discord
 from typing import Optional
-from random import random
+import random
 import openai  
 
 
