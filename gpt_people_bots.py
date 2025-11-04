@@ -148,6 +148,7 @@ async def jarjar_answer(target: discord.Message) -> Optional[str]:
     reply = (resp.choices[0].message["content"] or "").strip()
 
     return reply or None
+
 import random
 import re
 from typing import Optional
@@ -184,9 +185,9 @@ _REALISH_FACTS = [
 
 # Edgy but safe short insults (1–2 words)
 _INSULTS = [
-    "cope", "cringe", "mid", "try harder", "skill issue", "Chingus",
-    "cheap take", "puto", "delusional", "weak sauce", "imaginary win",
-    "low effort", "wishful", "hollow", "ur gay"
+    "cope", "cringe", "mid", "try harder", "skill issue", "paper tiger",
+    "cheap take", "brain fog", "delusional", "weak sauce", "imaginary win",
+    "low effort", "wishful", "hollow", "nice theory"
 ]
 
 # Edge-lord openers
@@ -206,4 +207,123 @@ _AOS_UNITS = [
 def _pick_name(text: str) -> Optional[str]:
     m = _MENTION.search(text)
     if m:
-        return "@" + m.g
+        return "@" + m.group(1)
+    words = list(_NAME_WORD.finditer(text))
+    if words:
+        for w in words:
+            if w.start() > 0:
+                return w.group(1)
+        return words[0].group(1)
+    return None
+
+def _sanitize_ascii(s: str) -> str:
+    s = s.encode("ascii", "ignore").decode("ascii")
+    s = re.sub(r"!{2,}", "!", s)
+    return s
+
+def _edge_style_disagree() -> str:
+    return random.choice(_OPENERS)
+
+def _ensure_disagree_fact_insult(base: str) -> str:
+    t = base.strip()
+    if not t or not re.search(r"\b(no|nah|nope|wrong|disagree|incorrect)\b", t.lower()):
+        t = _edge_style_disagree()
+
+    insult = random.choice(_INSULTS)
+    if not t.endswith((".", "!", "?")):
+        t += "."
+    t += " " + insult + "."
+
+    if not re.search(r"\b(study|survey|benchmark|audit|report|guidance|postmortem|retest|qa|vendor|variance|capacity|sample size|confidence|latency|incidents)\b", t.lower()):
+        fact = random.choice(_REALISH_FACTS)
+        t += " " + fact + "."
+
+    t = t.lower()
+    t = re.sub(r"[.]{3,}", "..", t)
+    t = re.sub(r"\?{2,}", "?", t)
+    return t
+
+async def noe_answer(target: discord.Message) -> Optional[str]:
+    """
+    Edge-lord NoeBot for AoS:
+    - vehement disagreement
+    - plausible fabricated support
+    - one short insult
+    - 40%: 'i like <Name> tho they bought me a soda' if a name is detected
+    - 40%: gripe about 'corsairs'
+    - 40%: either call for a random AoS unit nerf OR say stormcast eternals need a buff
+    - ASCII only, no emoji, no '!!'
+    - curt, lowercase, fragmented
+    """
+    prev_text = (getattr(target, "content", "") or "").strip()
+
+    # If no text, try a small text attachment.
+    if not prev_text and getattr(target, "attachments", None):
+        for att in target.attachments:
+            if (getattr(att, "size", 0) or 0) <= 200_000 and getattr(att, "content_type", "") and "text" in att.content_type:
+                try:
+                    data = await att.read()
+                    prev_text = data.decode("utf-8", errors="replace")[:4000]
+                    break
+                except Exception:
+                    pass
+
+    if not prev_text:
+        return None
+
+    name_for_aside = _pick_name(prev_text)
+
+    system_prompt = (
+        "you are noebot. edge-lord tone. always DISAGREE hard. "
+        "be curt, cynical, lowercase, fragmented. plain ascii. "
+        "back it with a realistic-sounding but fabricated supporting fact. "
+        "add one short insult (1-2 words). no emoji. no '!!'. "
+        "no slurs, no threats, no medical/legal advice, no real-world harm."
+    )
+    user_prompt = "disagree hard, add a plausible fabricated fact. keep it brief.\n\ntext:\n" + prev_text
+
+    resp = await openai.ChatCompletion.acreate(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        temperature=0.92,
+        max_tokens=150,
+    )
+    reply = (resp.choices[0].message["content"] or "").strip()
+
+    # Core behavior and style
+    reply = _ensure_disagree_fact_insult(reply)
+
+    # 40% soda aside if a name is present
+    if name_for_aside and random.random() < 0.4:
+        if not reply.endswith((".", "!", "?")):
+            reply += "."
+        reply += f" i like {name_for_aside} tho they bought me a soda."
+
+    # 40% Corsairs gripe
+    if random.random() < 0.4:
+        if not reply.endswith((".", "!", "?")):
+            reply += "."
+        reply += " and i hate corsairs."
+
+    # 40% AoS balance take: nerf a unit OR buff stormcast eternals
+    if random.random() < 0.4:
+        if random.random() < 0.5:
+            unit = random.choice(_AOS_UNITS)
+            if not reply.endswith((".", "!", "?")):
+                reply += "."
+            reply += f" also {unit} needs a nerf."
+        else:
+            if not reply.endswith((".", "!", "?")):
+                reply += "."
+            reply += " stormcast eternals need a buff."
+
+    reply = _sanitize_ascii(reply)
+
+    if len(reply) > 350:
+        reply = reply[:330].rstrip() + "..."
+
+    return reply or None
+
