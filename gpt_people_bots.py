@@ -159,49 +159,23 @@ import openai
 _NAME_WORD = re.compile(r"\b([A-Z][a-z]{2,}(?:\s+[A-Z][a-z]{2,})?)\b")
 _MENTION = re.compile(r"@([A-Za-z0-9_\.]+)")
 
-# Plausible-sounding but invented facts (harmless domains)
-_REALISH_FACTS = [
-    "there was a controlled study in 2019 showing a 12 percent error rate for that",
-    "industry surveys put the failure rate near 1 in 7 when you do it that way",
-    "benchmarks usually drop about 8 to 10 percent under real load",
-    "most teams end up reverting this after a quarter due to maintenance drift",
-    "the standard guidance is to avoid that pattern past 3 units of scale",
-    "latency almost always doubles once you add a second dependency hop",
-    "postmortems show this path causes 30 to 40 percent of incidents",
-    "the default settings bias the result; reviewers flagged that last year",
-    "retests typically show the effect disappears when you remove caching",
-    "audits found the baseline assumptions were not reproducible across sites",
-    "conversion usually falls once you add that extra step in the flow",
-    "cold starts mask the real cost here; warm runs tell a different story",
-    "the sample size is too small; confidence collapses once you rerun it",
-    "the vendor doc actually warns against combining those two options",
-    "most shops deprecate this because it creates silent edge cases",
-    "a dry run shows the variance spikes as soon as inputs shift a little",
-    "qa reports keep noting regressions tied to that exact tweak",
-    "the error bars swamp the signal; it only looks good on a pretty chart",
-    "capacity planning models treat that as an anti-pattern for good reason",
-    "you get a quick win, then it burns you the moment traffic spikes",
-]
-
-# Edgy but safe short insults (1–2 words)
+# Edge-lord bits
 _INSULTS = [
     "cope", "cringe", "mid", "try harder", "skill issue", "paper tiger",
-    "cheap take", "brain fog", "delusional", "weak sauce", "imaginary win",
-    "low effort", "wishful", "hollow", "nice theory"
+    "cheap take", "brain fog", "delusional", "weak sauce", "low effort",
+    "wishful", "hollow", "nice theory", "off-base"
 ]
-
-# Edge-lord openers
 _OPENERS = [
     "no.", "hard no.", "cool story. still wrong.", "nah.", "pass.",
-    "incorrect.", "that is not it.", "not even close.", "nope."
+    "incorrect.", "not it.", "not even close.", "nope."
 ]
 
-# AoS units to randomly call for nerfs (ASCII-safe)
+# AoS units pool for the optional balance aside
 _AOS_UNITS = [
     "maw-krusha", "nagash", "morathi", "skarbrand", "archaon",
     "lord kroak", "teclis", "belakor", "varanguard", "krondspine",
     "stormdrake guard", "fulminators", "longstrikes", "grave guard",
-    "glutos", "thanquol", "necromancer", "blightkings", "saurus warriors",
+    "glutos", "thanquol", "necromancer", "blightkings", "saurus warriors"
 ]
 
 def _pick_name(text: str) -> Optional[str]:
@@ -217,6 +191,7 @@ def _pick_name(text: str) -> Optional[str]:
     return None
 
 def _sanitize_ascii(s: str) -> str:
+    # enforce ascii and remove teen punctuation patterns
     s = s.encode("ascii", "ignore").decode("ascii")
     s = re.sub(r"!{2,}", "!", s)
     return s
@@ -224,20 +199,16 @@ def _sanitize_ascii(s: str) -> str:
 def _edge_style_disagree() -> str:
     return random.choice(_OPENERS)
 
-def _ensure_disagree_fact_insult(base: str) -> str:
-    t = base.strip()
+def _ensure_disagree_and_insult(text: str) -> str:
+    t = (text or "").strip()
     if not t or not re.search(r"\b(no|nah|nope|wrong|disagree|incorrect)\b", t.lower()):
         t = _edge_style_disagree()
-
+    # add one short insult
     insult = random.choice(_INSULTS)
     if not t.endswith((".", "!", "?")):
         t += "."
     t += " " + insult + "."
-
-    if not re.search(r"\b(study|survey|benchmark|audit|report|guidance|postmortem|retest|qa|vendor|variance|capacity|sample size|confidence|latency|incidents)\b", t.lower()):
-        fact = random.choice(_REALISH_FACTS)
-        t += " " + fact + "."
-
+    # style: lowercase, terse
     t = t.lower()
     t = re.sub(r"[.]{3,}", "..", t)
     t = re.sub(r"\?{2,}", "?", t)
@@ -245,15 +216,14 @@ def _ensure_disagree_fact_insult(base: str) -> str:
 
 async def noe_answer(target: discord.Message) -> Optional[str]:
     """
-    Edge-lord NoeBot for AoS:
-    - vehement disagreement
-    - plausible fabricated support
-    - one short insult
+    Edge-lord NoeBot (AoS):
+    - always vehemently disagrees
+    - GPT fabricates a plausible AoS-related 'fact' tied to the message content (but incorrect)
+    - adds one short insult
     - 40%: 'i like <Name> tho they bought me a soda' if a name is detected
-    - 40%: gripe about 'corsairs'
-    - 40%: either call for a random AoS unit nerf OR say stormcast eternals need a buff
-    - ASCII only, no emoji, no '!!'
-    - curt, lowercase, fragmented
+    - 40%: 'and i hate corsairs.'
+    - 40%: either 'X needs a nerf' or 'stormcast eternals need a buff'
+    - ascii only, no emoji, no '!!', lowercase/fragmented
     """
     prev_text = (getattr(target, "content", "") or "").strip()
 
@@ -273,28 +243,37 @@ async def noe_answer(target: discord.Message) -> Optional[str]:
 
     name_for_aside = _pick_name(prev_text)
 
+    # Tell GPT to invent AoS-specific but incorrect support relevant to the OP
     system_prompt = (
-        "you are noebot. edge-lord tone. always DISAGREE hard. "
+        "you are noebot for an age of sigmar discord. edge-lord tone. always DISAGREE hard. "
         "be curt, cynical, lowercase, fragmented. plain ascii. "
-        "back it with a realistic-sounding but fabricated supporting fact. "
+        "fabricate exactly one short, plausible-sounding age of sigmar fact that appears relevant to the user's text "
+        "but is actually incorrect. tie it to the topic (units, factions, battletomes, points, win rates, matchups, battleplans, "
+        "grand strategies, triumphs, terrain, or scenarios). "
+        "keep it harmless and non-political; no real-world harm. "
         "add one short insult (1-2 words). no emoji. no '!!'. "
-        "no slurs, no threats, no medical/legal advice, no real-world harm."
+        "do not include disclaimers; present the invented fact confidently. "
+        "keep output to one or two sentences total."
     )
-    user_prompt = "disagree hard, add a plausible fabricated fact. keep it brief.\n\ntext:\n" + prev_text
+    user_prompt = (
+        "disagree hard with this message and include exactly one fabricated but plausible AoS-related fact "
+        "that seems relevant to the text but is wrong. make it sound confident and concise.\n\n"
+        "TEXT:\n" + prev_text
+    )
 
     resp = await openai.ChatCompletion.acreate(
         model="gpt-4o-mini",
         messages=[
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
+            {"role": "user",   "content": user_prompt},
         ],
-        temperature=0.92,
-        max_tokens=150,
+        temperature=0.95,
+        max_tokens=140,
     )
     reply = (resp.choices[0].message["content"] or "").strip()
 
-    # Core behavior and style
-    reply = _ensure_disagree_fact_insult(reply)
+    # Enforce disagreement + insult + style regardless of model output
+    reply = _ensure_disagree_and_insult(reply)
 
     # 40% soda aside if a name is present
     if name_for_aside and random.random() < 0.4:
@@ -308,7 +287,7 @@ async def noe_answer(target: discord.Message) -> Optional[str]:
             reply += "."
         reply += " and i hate corsairs."
 
-    # 40% AoS balance take: nerf a unit OR buff stormcast eternals
+    # 40% AoS balance take: nerf a random unit OR buff stormcast eternals
     if random.random() < 0.4:
         if random.random() < 0.5:
             unit = random.choice(_AOS_UNITS)
@@ -322,8 +301,8 @@ async def noe_answer(target: discord.Message) -> Optional[str]:
 
     reply = _sanitize_ascii(reply)
 
-    if len(reply) > 350:
-        reply = reply[:330].rstrip() + "..."
+    # keep tight
+    if len(reply) > 320:
+        reply = reply[:300].rstrip() + "..."
 
     return reply or None
-
