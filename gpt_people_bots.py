@@ -148,7 +148,6 @@ async def jarjar_answer(target: discord.Message) -> Optional[str]:
     reply = (resp.choices[0].message["content"] or "").strip()
 
     return reply or None
-
 import random
 import re
 from typing import Optional
@@ -159,7 +158,7 @@ import openai
 _NAME_WORD = re.compile(r"\b([A-Z][a-z]{2,}(?:\s+[A-Z][a-z]{2,})?)\b")
 _MENTION = re.compile(r"@([A-Za-z0-9_\.]+)")
 
-# Plausible-sounding but invented facts (keep harmless, non-medical, non-political)
+# Plausible-sounding but invented facts (harmless domains)
 _REALISH_FACTS = [
     "there was a controlled study in 2019 showing a 12 percent error rate for that",
     "industry surveys put the failure rate near 1 in 7 when you do it that way",
@@ -170,132 +169,41 @@ _REALISH_FACTS = [
     "postmortems show this path causes 30 to 40 percent of incidents",
     "the default settings bias the result; reviewers flagged that last year",
     "retests typically show the effect disappears when you remove caching",
-    "audits found the baseline assumptions weren’t reproducible across sites",
+    "audits found the baseline assumptions were not reproducible across sites",
     "conversion usually falls once you add that extra step in the flow",
     "cold starts mask the real cost here; warm runs tell a different story",
     "the sample size is too small; confidence collapses once you rerun it",
     "the vendor doc actually warns against combining those two options",
     "most shops deprecate this because it creates silent edge cases",
-    "a dry run shows the variance balloons as soon as inputs shift a little",
-    "QA reports keep noting regressions tied to that exact tweak",
+    "a dry run shows the variance spikes as soon as inputs shift a little",
+    "qa reports keep noting regressions tied to that exact tweak",
     "the error bars swamp the signal; it only looks good on a pretty chart",
     "capacity planning models treat that as an anti-pattern for good reason",
-    "you can get a quick win, but it burns you the moment traffic spikes",
+    "you get a quick win, then it burns you the moment traffic spikes",
 ]
 
-# Short, mild insults (1–2 words), non-profane, non-targeted
+# Edgy but safe short insults (1–2 words)
 _INSULTS = [
-    "rookie move", "amateur", "clueless", "sloppy", "naive", "messy",
-    "paper-thin", "wishful", "half-baked", "wobbly", "shaky logic",
-    "weak take", "off-base", "confused", "not serious"
+    "cope", "cringe", "mid", "try harder", "skill issue", "Chingus",
+    "cheap take", "puto", "delusional", "weak sauce", "imaginary win",
+    "low effort", "wishful", "hollow", "ur gay"
+]
+
+# Edge-lord openers
+_OPENERS = [
+    "no.", "hard no.", "cool story. still wrong.", "nah.", "pass.",
+    "incorrect.", "that is not it.", "not even close.", "nope."
+]
+
+# AoS units to randomly call for nerfs (ASCII-safe)
+_AOS_UNITS = [
+    "maw-krusha", "nagash", "morathi", "skarbrand", "archaon",
+    "lord kroak", "teclis", "belakor", "varanguard", "krondspine",
+    "stormdrake guard", "fulminators", "longstrikes", "grave guard",
+    "glutos", "thanquol", "necromancer", "blightkings", "saurus warriors",
 ]
 
 def _pick_name(text: str) -> Optional[str]:
     m = _MENTION.search(text)
     if m:
-        return "@" + m.group(1)
-    words = list(_NAME_WORD.finditer(text))
-    if words:
-        for w in words:
-            if w.start() > 0:
-                return w.group(1)
-        return words[0].group(1)
-    return None
-
-def _sanitize_ascii(s: str) -> str:
-    # force ASCII, remove emojis/non-ascii, collapse multiple exclamations
-    s = s.encode("ascii", "ignore").decode("ascii")
-    s = re.sub(r"!{2,}", "!", s)
-    return s
-
-def _ensure_disagree_fact_insult(base: str) -> str:
-    t = base.strip()
-
-    # Ensure strong disagreement (without teen style)
-    if not re.search(r"\b(no|nah|nope|wrong|disagree)\b", t.lower()):
-        t = ("no. " + t) if t else "no."
-
-    # Add a short insult (always include one)
-    insult = random.choice(_INSULTS)
-    if not t.endswith((".", "!", "?")):
-        t += "."
-    t += " " + insult + "."
-
-    # Ensure a realistic-sounding (but false) supporting fact
-    if not re.search(r"\b(study|survey|benchmarks?|audits?|reports?|guidance|postmortems?|retests?|qa|vendor|variance|capacity)\b", t.lower()):
-        fact = random.choice(_REALISH_FACTS)
-        t += " " + fact + "."
-
-    return t
-
-async def noe_answer(target: discord.Message) -> Optional[str]:
-    """
-    Vehemently disagree + realistic-sounding fabricated support.
-    Adds a short insult (1-2 words).
-    40% chance: 'i like <Name> tho they bought me a soda' if a name is detected.
-    40% chance: gripe about 'Corsairs'.
-    ASCII only. No emoji. No teeny tone.
-    """
-    prev_text = (getattr(target, "content", "") or "").strip()
-
-    # If no text, try a small text attachment.
-    if not prev_text and getattr(target, "attachments", None):
-        for att in target.attachments:
-            if (getattr(att, "size", 0) or 0) <= 200_000 and getattr(att, "content_type", "") and "text" in att.content_type:
-                try:
-                    data = await att.read()
-                    prev_text = data.decode("utf-8", errors="replace")[:4000]
-                    break
-                except Exception:
-                    pass
-
-    if not prev_text:
-        return None
-
-    name_for_aside = _pick_name(prev_text)
-
-    system_prompt = (
-        "You are NoeBot. Always vehemently DISAGREE with what was said. "
-        "Back it up with a realistic-sounding (but fabricated) supporting fact. "
-        "Style: plain ASCII, concise, professional-snarky, not teenager, no emoji, no double exclamation. "
-        "Keep sentences short; light punctuation; occasional lowercase ok; readable. "
-        "No slurs, threats, medical/legal advice, or harmful real-world claims."
-    )
-    user_prompt = "Disagree strongly and add a plausible supporting fact. Keep it brief.\n\nTEXT:\n" + prev_text
-
-    resp = await openai.ChatCompletion.acreate(
-        model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-        temperature=0.9,
-        max_tokens=160,
-    )
-    reply = (resp.choices[0].message["content"] or "").strip()
-
-    # Guarantee core behavior
-    reply = _ensure_disagree_fact_insult(reply)
-
-    # 40% soda aside if a name is present
-    if name_for_aside and random.random() < 0.4:
-        if not reply.endswith((".", "!", "?")):
-            reply += "."
-        reply += f" i like {name_for_aside} tho they bought me a soda."
-
-    # 40% Corsairs gripe
-    if random.random() < 0.4:
-        if not reply.endswith((".", "!", "?")):
-            reply += "."
-        reply += " and i hate Corsairs."
-
-    # Final sanitation
-    reply = _sanitize_ascii(reply)
-
-    # Keep it reasonably short
-    if len(reply) > 400:
-        reply = reply[:380].rstrip() + "..."
-
-    return reply or None
-
-
+        return "@" + m.g
