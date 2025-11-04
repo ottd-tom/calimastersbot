@@ -149,67 +149,92 @@ async def jarjar_answer(target: discord.Message) -> Optional[str]:
 
     return reply or None
 
-
 import random
 import re
 from typing import Optional
 import discord
 import openai
 
-# Heuristic: detect a "name" either via @mention or a capitalized word not at the very start.
+# Heuristics for names
 _NAME_WORD = re.compile(r"\b([A-Z][a-z]{2,}(?:\s+[A-Z][a-z]{2,})?)\b")
 _MENTION = re.compile(r"@([A-Za-z0-9_\.]+)")
 
-_FAKE_FACTS = [
-    "everyone knows the moon is just a big night lamp",
-    "gravity actually takes weekends off",
-    "triangles have 4 sides if you count with vibes",
-    "the sun sets early because it has a second job",
-    "wifi signals are heavier when it rains snacks",
-    "cats invented economics in 1812 bc, look it up",
-    "time zones were made by dolphins for fun",
-    "plants photosynthesize memes not light",
-    "numbers above 12 are just marketing",
-    "maps are flat because paper wins arguments",
-    "clouds are stored locally on mountains",
-    "the ocean is 90 percent soup if you think about it",
-    "dinosaurs left because rent got too high",
-    "rain is sky tea, brewed badly",
-    "mirrors only work when you believe in them",
+# Plausible-sounding but invented facts (keep harmless, non-medical, non-political)
+_REALISH_FACTS = [
+    "there was a controlled study in 2019 showing a 12 percent error rate for that",
+    "industry surveys put the failure rate near 1 in 7 when you do it that way",
+    "benchmarks usually drop about 8 to 10 percent under real load",
+    "most teams end up reverting this after a quarter due to maintenance drift",
+    "the standard guidance is to avoid that pattern past 3 units of scale",
+    "latency almost always doubles once you add a second dependency hop",
+    "postmortems show this path causes 30 to 40 percent of incidents",
+    "the default settings bias the result; reviewers flagged that last year",
+    "retests typically show the effect disappears when you remove caching",
+    "audits found the baseline assumptions weren’t reproducible across sites",
+    "conversion usually falls once you add that extra step in the flow",
+    "cold starts mask the real cost here; warm runs tell a different story",
+    "the sample size is too small; confidence collapses once you rerun it",
+    "the vendor doc actually warns against combining those two options",
+    "most shops deprecate this because it creates silent edge cases",
+    "a dry run shows the variance balloons as soon as inputs shift a little",
+    "QA reports keep noting regressions tied to that exact tweak",
+    "the error bars swamp the signal; it only looks good on a pretty chart",
+    "capacity planning models treat that as an anti-pattern for good reason",
+    "you can get a quick win, but it burns you the moment traffic spikes",
+]
+
+# Short, mild insults (1–2 words), non-profane, non-targeted
+_INSULTS = [
+    "rookie move", "amateur", "clueless", "sloppy", "naive", "messy",
+    "paper-thin", "wishful", "half-baked", "wobbly", "shaky logic",
+    "weak take", "off-base", "confused", "not serious"
 ]
 
 def _pick_name(text: str) -> Optional[str]:
     m = _MENTION.search(text)
     if m:
         return "@" + m.group(1)
-    # find a capitalized word not at index 0
     words = list(_NAME_WORD.finditer(text))
     if words:
-        # prefer a name that does not start at 0
         for w in words:
             if w.start() > 0:
                 return w.group(1)
         return words[0].group(1)
     return None
 
-def _ensure_disagree_and_fact(reply: str) -> str:
-    t = reply.strip()
-    # Make sure it clearly disagrees
+def _sanitize_ascii(s: str) -> str:
+    # force ASCII, remove emojis/non-ascii, collapse multiple exclamations
+    s = s.encode("ascii", "ignore").decode("ascii")
+    s = re.sub(r"!{2,}", "!", s)
+    return s
+
+def _ensure_disagree_fact_insult(base: str) -> str:
+    t = base.strip()
+
+    # Ensure strong disagreement (without teen style)
     if not re.search(r"\b(no|nah|nope|wrong|disagree)\b", t.lower()):
-        t = "nah thats wrong. " + t
-    # Ensure a silly fake fact is present
-    if not re.search(r"\b(fact|everyone knows|actually)\b", t.lower()):
-        fake = random.choice(_FAKE_FACTS)
-        # keep it short, chatty
-        if not t.endswith((".", "!", "?")):
-            t += "."
-        t += " actually " + fake + "."
+        t = ("no. " + t) if t else "no."
+
+    # Add a short insult (always include one)
+    insult = random.choice(_INSULTS)
+    if not t.endswith((".", "!", "?")):
+        t += "."
+    t += " " + insult + "."
+
+    # Ensure a realistic-sounding (but false) supporting fact
+    if not re.search(r"\b(study|survey|benchmarks?|audits?|reports?|guidance|postmortems?|retests?|qa|vendor|variance|capacity)\b", t.lower()):
+        fact = random.choice(_REALISH_FACTS)
+        t += " " + fact + "."
+
     return t
 
 async def noe_answer(target: discord.Message) -> Optional[str]:
     """
-    Build a 'vehement disagree + fake fact' reply to the given message.
-    Returns the text reply, or None if no readable text.
+    Vehemently disagree + realistic-sounding fabricated support.
+    Adds a short insult (1-2 words).
+    40% chance: 'i like <Name> tho they bought me a soda' if a name is detected.
+    40% chance: gripe about 'Corsairs'.
+    ASCII only. No emoji. No teeny tone.
     """
     prev_text = (getattr(target, "content", "") or "").strip()
 
@@ -227,22 +252,16 @@ async def noe_answer(target: discord.Message) -> Optional[str]:
     if not prev_text:
         return None
 
-    # Detect a probable name for optional soda aside
     name_for_aside = _pick_name(prev_text)
 
     system_prompt = (
-        "You are NoeBot. You always vehemently DISAGREE with what was said, in a short, "
-        "mobile-typed, slightly chaotic way. Use plain ASCII. Keep it brief. "
-        "Invent a random, obviously untrue and silly 'fact' to back up your disagreement. "
-        "Style: short lines, light punctuation, sometimes lowercase, a typo here and there, but readable. "
-        "Avoid harmful or real-world dangerous claims; keep the 'facts' goofy and harmless. "
-        "No slurs, threats, medical/legal advice, or real conspiracy claims."
+        "You are NoeBot. Always vehemently DISAGREE with what was said. "
+        "Back it up with a realistic-sounding (but fabricated) supporting fact. "
+        "Style: plain ASCII, concise, professional-snarky, not teenager, no emoji, no double exclamation. "
+        "Keep sentences short; light punctuation; occasional lowercase ok; readable. "
+        "No slurs, threats, medical/legal advice, or harmful real-world claims."
     )
-
-    user_prompt = (
-        "Disagree strongly with this and add a made-up silly fact. Keep it brief.\n\n"
-        f"TEXT:\n{prev_text}"
-    )
+    user_prompt = "Disagree strongly and add a plausible supporting fact. Keep it brief.\n\nTEXT:\n" + prev_text
 
     resp = await openai.ChatCompletion.acreate(
         model="gpt-4o-mini",
@@ -250,22 +269,33 @@ async def noe_answer(target: discord.Message) -> Optional[str]:
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
         ],
-        temperature=0.95,
+        temperature=0.9,
         max_tokens=160,
     )
     reply = (resp.choices[0].message["content"] or "").strip()
 
-    # Guarantee the core behavior even if the model slacks
-    reply = _ensure_disagree_and_fact(reply)
+    # Guarantee core behavior
+    reply = _ensure_disagree_fact_insult(reply)
 
-    # 40% chance soda aside if a name is present
+    # 40% soda aside if a name is present
     if name_for_aside and random.random() < 0.4:
         if not reply.endswith((".", "!", "?")):
             reply += "."
         reply += f" i like {name_for_aside} tho they bought me a soda."
+
+    # 40% Corsairs gripe
+    if random.random() < 0.4:
+        if not reply.endswith((".", "!", "?")):
+            reply += "."
+        reply += " and i hate Corsairs."
+
+    # Final sanitation
+    reply = _sanitize_ascii(reply)
 
     # Keep it reasonably short
     if len(reply) > 400:
         reply = reply[:380].rstrip() + "..."
 
     return reply or None
+
+
