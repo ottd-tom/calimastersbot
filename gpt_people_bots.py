@@ -148,3 +148,124 @@ async def jarjar_answer(target: discord.Message) -> Optional[str]:
     reply = (resp.choices[0].message["content"] or "").strip()
 
     return reply or None
+
+
+import random
+import re
+from typing import Optional
+import discord
+import openai
+
+# Heuristic: detect a "name" either via @mention or a capitalized word not at the very start.
+_NAME_WORD = re.compile(r"\b([A-Z][a-z]{2,}(?:\s+[A-Z][a-z]{2,})?)\b")
+_MENTION = re.compile(r"@([A-Za-z0-9_\.]+)")
+
+_FAKE_FACTS = [
+    "everyone knows the moon is just a big night lamp",
+    "gravity actually takes weekends off",
+    "triangles have 4 sides if you count with vibes",
+    "the sun sets early because it has a second job",
+    "wifi signals are heavier when it rains snacks",
+    "cats invented economics in 1812 bc, look it up",
+    "time zones were made by dolphins for fun",
+    "plants photosynthesize memes not light",
+    "numbers above 12 are just marketing",
+    "maps are flat because paper wins arguments",
+    "clouds are stored locally on mountains",
+    "the ocean is 90 percent soup if you think about it",
+    "dinosaurs left because rent got too high",
+    "rain is sky tea, brewed badly",
+    "mirrors only work when you believe in them",
+]
+
+def _pick_name(text: str) -> Optional[str]:
+    m = _MENTION.search(text)
+    if m:
+        return "@" + m.group(1)
+    # find a capitalized word not at index 0
+    words = list(_NAME_WORD.finditer(text))
+    if words:
+        # prefer a name that does not start at 0
+        for w in words:
+            if w.start() > 0:
+                return w.group(1)
+        return words[0].group(1)
+    return None
+
+def _ensure_disagree_and_fact(reply: str) -> str:
+    t = reply.strip()
+    # Make sure it clearly disagrees
+    if not re.search(r"\b(no|nah|nope|wrong|disagree)\b", t.lower()):
+        t = "nah thats wrong. " + t
+    # Ensure a silly fake fact is present
+    if not re.search(r"\b(fact|everyone knows|actually)\b", t.lower()):
+        fake = random.choice(_FAKE_FACTS)
+        # keep it short, chatty
+        if not t.endswith((".", "!", "?")):
+            t += "."
+        t += " actually " + fake + "."
+    return t
+
+async def noe_answer(target: discord.Message) -> Optional[str]:
+    """
+    Build a 'vehement disagree + fake fact' reply to the given message.
+    Returns the text reply, or None if no readable text.
+    """
+    prev_text = (getattr(target, "content", "") or "").strip()
+
+    # If no text, try a small text attachment.
+    if not prev_text and getattr(target, "attachments", None):
+        for att in target.attachments:
+            if (getattr(att, "size", 0) or 0) <= 200_000 and getattr(att, "content_type", "") and "text" in att.content_type:
+                try:
+                    data = await att.read()
+                    prev_text = data.decode("utf-8", errors="replace")[:4000]
+                    break
+                except Exception:
+                    pass
+
+    if not prev_text:
+        return None
+
+    # Detect a probable name for optional soda aside
+    name_for_aside = _pick_name(prev_text)
+
+    system_prompt = (
+        "You are NoeBot. You always vehemently DISAGREE with what was said, in a short, "
+        "mobile-typed, slightly chaotic way. Use plain ASCII. Keep it brief. "
+        "Invent a random, obviously untrue and silly 'fact' to back up your disagreement. "
+        "Style: short lines, light punctuation, sometimes lowercase, a typo here and there, but readable. "
+        "Avoid harmful or real-world dangerous claims; keep the 'facts' goofy and harmless. "
+        "No slurs, threats, medical/legal advice, or real conspiracy claims."
+    )
+
+    user_prompt = (
+        "Disagree strongly with this and add a made-up silly fact. Keep it brief.\n\n"
+        f"TEXT:\n{prev_text}"
+    )
+
+    resp = await openai.ChatCompletion.acreate(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        temperature=0.95,
+        max_tokens=160,
+    )
+    reply = (resp.choices[0].message["content"] or "").strip()
+
+    # Guarantee the core behavior even if the model slacks
+    reply = _ensure_disagree_and_fact(reply)
+
+    # 40% chance soda aside if a name is present
+    if name_for_aside and random.random() < 0.4:
+        if not reply.endswith((".", "!", "?")):
+            reply += "."
+        reply += f" i like {name_for_aside} tho they bought me a soda."
+
+    # Keep it reasonably short
+    if len(reply) > 400:
+        reply = reply[:380].rstrip() + "..."
+
+    return reply or None
