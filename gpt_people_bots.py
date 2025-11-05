@@ -161,9 +161,9 @@ _MENTION = re.compile(r"@([A-Za-z0-9_\.]+)")
 
 # Edge-lord bits
 _INSULTS = [
-    "cope", "cringe", "mid", "try harder", "skill issue", "paper tiger",
-    "cheap take", "brain fog", "delusional", "weak sauce", "low effort",
-    "wishful", "hollow", "nice theory", "off-base"
+    "cope", "cringe", "mid", "try harder", "skill issue", "puto",
+    "cheap take", "Chingus", "delusional", "weak sauce", "low effort",
+    "wishful", "hollow", "nice theory", "gringo"
 ]
 _OPENERS = [
     "no.", "hard no.", "cool story. still wrong.", "nah.", "pass.",
