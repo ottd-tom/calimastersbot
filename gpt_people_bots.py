@@ -148,7 +148,62 @@ async def jarjar_answer(target: discord.Message) -> Optional[str]:
     reply = (resp.choices[0].message["content"] or "").strip()
 
     return reply or None
+    
+    
+async def yoda_answer(target: discord.Message) -> Optional[str]:
+    """
+    Build a yoda reply
+    Returns the text reply, or None if no readable text.
+    """
+    prev_text = (getattr(target, "content", "") or "").strip()
 
+    # If no text, try a small text attachment.
+    if not prev_text and getattr(target, "attachments", None):
+        for att in target.attachments:
+            if (getattr(att, "size", 0) or 0) <= 200_000 and getattr(att, "content_type", "") and "text" in att.content_type:
+                try:
+                    data = await att.read()
+                    prev_text = data.decode("utf-8", errors="replace")[:4000]
+                    break
+                except Exception:
+                    pass
+
+    if not prev_text:
+        return None
+
+    system_prompt = (
+        "You are YodaBot. You rewrite messages in a Yoda-like voice (inverted syntax), "
+        "without quoting or imitating specific lines from the films. Keep outputs short (1-2 sentences), "
+        "slightly confused and off-point. Use plain ASCII only.\n\n"
+        "Style guide:\n"
+        "- Invert word order often: object-subject-verb or verb-final constructions (e.g., \"Strong this idea is\").\n"
+        "- Drop some articles and helper words; use sentence fragments.\n"
+        "- Keep a calm, sage tone; sprinkle occasional \"hmm\" or rhetorical questions, but not every time.\n"
+        "- Keep punctuation light; lowercase is fine; no emojis.\n"
+        "- Do not add facts or names; do not mention Star Wars.\n"
+        "- 1-2 short sentences max; stay friendly and a bit cryptic."
+    )
+
+    user_prompt = (
+        "Rewrite the text below so it sounds like a Yoda-style take: "
+        "dumber, a little off the point, and very brief. "
+        "Do not add new info or names. Keep to 1-2 sentences, ASCII only.\n\n"
+        f"TEXT:\n{prev_text}"
+    )
+
+
+    resp = await openai.ChatCompletion.acreate(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        temperature=0.9,
+        max_tokens=200,
+    )
+    reply = (resp.choices[0].message["content"] or "").strip()
+
+    return reply or None
 import random
 import re
 from typing import Optional
