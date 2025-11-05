@@ -45,8 +45,8 @@ async def noog_answer(target: discord.Message) -> Optional[str]:
 
     if not prev_text:
         return None
-
-    if random.random() < 0.2:
+    myrng = random.Random()
+    if myrng.random() < 0.2:
         system_prompt = (
             "You are NoogBot. You repeat what someone else said, but in a dumber way, "
             "often missing the point. Keep it short, a bit confused, and kind of wrong. "
