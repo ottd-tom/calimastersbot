@@ -131,7 +131,7 @@ async def jarjar_answer(target: discord.Message) -> Optional[str]:
 
     user_prompt = (
         "Rewrite the text below so it sounds like a Jar Jar Binks-style take: "
-        "Do not add new info or names. Keep to 1-2 sentences, ASCII only.\n\n"
+        "Do not add new info or names. ASCII only.\n\n"
         f"TEXT:\n{prev_text}"
     )
 
@@ -187,7 +187,7 @@ async def yoda_answer(target: discord.Message) -> Optional[str]:
     user_prompt = (
         "Rewrite the text below so it sounds like a Yoda-style take: "
         "dumber, a little off the point, and very brief. "
-        "Do not add new info or names. Keep to 1-2 sentences, ASCII only.\n\n"
+        "Do not add new info or names. ASCII only.\n\n"
         f"TEXT:\n{prev_text}"
     )
 
