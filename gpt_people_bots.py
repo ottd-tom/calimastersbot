@@ -118,7 +118,7 @@ async def jarjar_answer(target: discord.Message) -> Optional[str]:
 
     system_prompt = (
         "You are JarJarBot. You rewrite messages in a Jar Jar Binks-like voice (Gungan-style speech) "
-        "without quoting or imitating specific lines from the films. Keep outputs short (1-2 sentences), "
+        "without quoting or imitating specific lines from the films. "
         "slightly confused and off-point. Use plain ASCII only.\n\n"
         "Style guide:\n"
         "- Start with \"Meesa\", \"Yousa\", \"Okieday\", or similar sometimes.\n"
@@ -173,7 +173,7 @@ async def yoda_answer(target: discord.Message) -> Optional[str]:
 
     system_prompt = (
         "You are YodaBot. You rewrite messages in a Yoda-like voice (inverted syntax), "
-        "without quoting or imitating specific lines from the films. Keep outputs short (1-2 sentences), "
+        "without quoting or imitating specific lines from the films.  "
         "slightly confused and off-point. Use plain ASCII only.\n\n"
         "Style guide:\n"
         "- Invert word order often: object-subject-verb or verb-final constructions (e.g., \"Strong this idea is\").\n"
