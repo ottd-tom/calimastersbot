@@ -233,17 +233,79 @@ _AOS_UNITS = [
     "glutos", "thanquol", "necromancer", "blightkings", "saurus warriors"
 ]
 
-def _pick_name(text: str) -> Optional[str]:
-    m = _MENTION.search(text)
+import re
+
+# Common false-positives to skip when guessing names from capitalization
+_STOPWORDS_CAP = {
+    "I","Im","The","This","That","It","You","We","They","He","She",
+    "Yes","No","Ok","Okay","Lol","BTW","FYI","IMO","IDK",
+    "Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday",
+    "Today","Tomorrow","Yesterday",
+}
+
+# <@123>, <@!123> style
+_DISCORD_ID_MENTION = re.compile(r"<@!?\d+>")
+# @username style
+_AT_USERNAME = re.compile(r"@([A-Za-z0-9_.]+)")
+# "Capitalized" or Title Case sequences NOT at sentence start
+_TITLE_NAME = re.compile(
+    r"(?<!^)(?<![.!?]\s)\b([A-Z][a-z]{2,}(?:\s+[A-Z][a-z]{2,}){0,2})\b"
+)
+
+def _pick_name(target, text: str):
+    """
+    Picks a likely name/handle to reference for the soda aside.
+    Priority:
+      1) message.mentions
+      2) <@...> ID mention tokens
+      3) @username text
+      4) Title-Case tokens not at sentence start (filtered)
+    Returns a string to echo (e.g., '@someone' or 'Alice'), or None.
+    """
+    # 1) Real Discord mentions
+    try:
+        mentions = getattr(target, "mentions", None) or []
+        if mentions:
+            m = mentions[0]
+            # Prefer @display_name; fall back to @name; last resort @<id>
+            handle = getattr(m, "display_name", None) or getattr(m, "name", None)
+            if handle:
+                return "@" + handle
+            uid = getattr(m, "id", None)
+            if uid:
+                return f"<@{uid}>"
+    except Exception:
+        pass
+
+    # 2) <@...> tokens in content
+    m = _DISCORD_ID_MENTION.search(text)
+    if m:
+        return m.group(0)
+
+    # 3) @username text
+    m = _AT_USERNAME.search(text)
     if m:
         return "@" + m.group(1)
-    words = list(_NAME_WORD.finditer(text))
-    if words:
-        for w in words:
-            if w.start() > 0:
-                return w.group(1)
-        return words[0].group(1)
+
+    # 4) Title-Case words not at sentence start (skip common junk)
+    for m in _TITLE_NAME.finditer(text):
+        cand = m.group(1).strip()
+        # reject if too long (more than 3 words) or first word is a stopword
+        parts = cand.split()
+        if len(parts) > 3:
+            continue
+        if parts[0] in _STOPWORDS_CAP:
+            continue
+        # avoid ALL CAPS or acronyms
+        if cand.isupper():
+            continue
+        # avoid grabbing first token of whole message
+        if m.start() == 0:
+            continue
+        return cand
+
     return None
+
 
 def _sanitize_ascii(s: str) -> str:
     # enforce ascii and remove teen punctuation patterns
