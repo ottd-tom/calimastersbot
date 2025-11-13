@@ -2154,6 +2154,10 @@ async def generateteam_cmd(ctx, days: int = 30):
 TARGET_GUILD_ID = 803881553108795413  # socal discord
 TARGET_USER_ID = 684591023678292010  # Barker
 
+
+TARGET_GUILD_ID = 940470229732032583  # test discord
+TARGET_USER_ID = 199725130337878017  # me
+
 @aos_bot.event
 async def on_message(message: discord.Message):
     # Always ignore other bots (including yourself)
