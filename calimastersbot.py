@@ -2175,7 +2175,7 @@ async def on_message(message: discord.Message):
             await message.channel.send("BCP sucks")
 
     # Important: let commands still work if you use commands extension
-    await bot.process_commands(message)
+    await aos_bot.process_commands(message)
 
 
 
