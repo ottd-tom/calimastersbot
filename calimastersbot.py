@@ -2150,6 +2150,32 @@ async def generateteam_cmd(ctx, days: int = 30):
     await ctx.send("Done. :crossed_swords:")
 
 
+# IDs for the target server and user
+TARGET_GUILD_ID = 803881553108795413  # socal discord
+TARGET_USER_ID = 684591023678292010  # Barker
+
+@aos_bot.event
+async def on_message(message: discord.Message):
+    # Always ignore other bots (including yourself)
+    if message.author.bot:
+        return
+
+    # Only act in the specific server and for the specific user
+    if (
+        message.guild is not None
+        and message.guild.id == TARGET_GUILD_ID
+        and message.author.id == TARGET_USER_ID
+    ):
+        # Check if "BCP" is mentioned (case-insensitive)
+        if "bcp" in message.content.lower():
+            await message.channel.send("BCP sucks")
+
+    # Important: let commands still work if you use commands extension
+    await bot.process_commands(message)
+
+
+
+
 async def send_single(ctx, key, time_filter):
     name = ALIAS_MAP[key]
     data = await fetch_winrates(time_filter)
