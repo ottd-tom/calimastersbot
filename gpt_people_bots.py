@@ -358,7 +358,7 @@ async def noe_answer(target: discord.Message) -> Optional[str]:
     if not prev_text:
         return None
 
-    name_for_aside = _pick_name(prev_text)
+    name_for_aside = _pick_name(target, prev_text)
 
     # Tell GPT to invent AoS-specific but incorrect support relevant to the OP
     system_prompt = (
