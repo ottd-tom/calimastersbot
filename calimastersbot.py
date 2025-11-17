@@ -241,7 +241,7 @@ ALIAS_MAP        = {
     'kb': 'Kruleboyz', 'kruleboyz': 'Kruleboyz',
     'fs': 'Fyreslayers', 'fyreslayers': 'Fyreslayers',
     'gitz': 'Gloomspite Gitz', 'gloomspite gitz': 'Gloomspite Gitz',
-    'hoh' : 'Helsmiths of Hashut', 'helsmiths': 'Helsmiths of Hashut',
+    'hoh' : 'Helsmiths of Hashut', 'helsmiths': 'Helsmiths of Hashut', 'chorfs': "Helsmiths of Hashut'
 }
 for full in set(ALIAS_MAP.values()):
     ALIAS_MAP[full.lower()] = full
