@@ -2176,6 +2176,9 @@ async def on_message(message: discord.Message):
         if "bcp" in message.content.lower():
             await message.channel.send("BCP sucks")
 
+        if "best coast pairings" in message.content.lower():
+            await message.channel.send("Best Coast Pairings sucks")
+
     # Important: let commands still work if you use commands extension
     await aos_bot.process_commands(message)
 
