@@ -2117,7 +2117,6 @@ async def send_code_block(ctx, title: str, body: str):
     trimmed = truncate_content(body, max_len=1850)
     await ctx.send(f"**{title}**\n```{trimmed}```")
 
-
 @aos_bot.command(
     name='generateteam',
     help='Generate 8 recent high-performing lists (5-round events, 4-1/5-0), no duplicate factions. Usage: !generateteam [days]'
@@ -2150,6 +2149,40 @@ async def generateteam_cmd(ctx, days: int = 30):
         await send_code_block(ctx, title, item.get("list_text", "(no list text)"))
 
     await ctx.send("Done. :crossed_swords:")
+
+ghbmissions = {
+    "Passing Seasons",
+    "Roiling Roots",
+    "Cyclic Shifts",
+    "Surge of Slaughter",
+    "Linked Ley Lines",
+    "The Liferoots",
+    "Bountiful Equinox",
+    "Lifecycle",
+    "Creeping Corruption",
+    "Grasp of Thorns"
+}
+
+@aos_bot.command(
+    name='thommoisinadequate',
+)
+async def thommoisinadequate_cmd(ctx, rounds: int = 5):
+    # Sanity clamp
+    if rounds < 1:
+        return await ctx.send("Number of rounds must be at least 1.")
+
+    # Make sure we don't ask for more missions than exist
+    missions_pool = list(ghbmissions)
+    k = min(rounds, len(missions_pool))
+
+    # Random unique missions
+    selected = random.sample(missions_pool, k=k)
+
+    # One mission per line
+    text = "\n".join(selected)
+
+    await ctx.send(text)
+
 
 
 # IDs for the target server and user
