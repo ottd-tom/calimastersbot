@@ -2162,24 +2162,24 @@ ghbmissions = {
     "Creeping Corruption",
     "Grasp of Thorns"
 }
-
 @aos_bot.command(
     name='thommoisinadequate',
+    help='Pick random GHB missions; usage: !thommoisinadequate [rounds]'
 )
 async def thommoisinadequate_cmd(ctx, rounds: int = 5):
     # Sanity clamp
     if rounds < 1:
         return await ctx.send("Number of rounds must be at least 1.")
 
-    # Make sure we don't ask for more missions than exist
     missions_pool = list(ghbmissions)
     k = min(rounds, len(missions_pool))
 
     # Random unique missions
     selected = random.sample(missions_pool, k=k)
 
-    # One mission per line
-    text = "\n".join(selected)
+    # One numbered mission per line
+    lines = [f"{i}. {mission}" for i, mission in enumerate(selected, start=1)]
+    text = "\n".join(lines)
 
     await ctx.send(text)
 
