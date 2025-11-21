@@ -2206,7 +2206,11 @@ async def on_message(message: discord.Message):
         and message.author.id == TARGET_USER_ID
     ):
         # Check if "BCP" is mentioned (case-insensitive)
-        if "bcp" in message.content.lower():
+        content = message.content.lower()
+        
+        # remove all spaces
+        normalized = re.sub(r"\s+", "", content)        
+        if "bcp" in normalized:
             await message.channel.send("BCP sucks")
 
         if "best coast pairings" in message.content.lower():
