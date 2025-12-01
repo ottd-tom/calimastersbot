@@ -268,6 +268,64 @@ async def wallace_answer(target: discord.Message) -> Optional[str]:
     return reply or None
 
 
+async def redcoat_answer(target: discord.Message) -> Optional[str]:
+    """
+    Build a wallace reply
+    Returns the text reply, or None if no readable text.
+    """
+    prev_text = (getattr(target, "content", "") or "").strip()
+
+    # If no text, try a small text attachment.
+    if not prev_text and getattr(target, "attachments", None):
+        for att in target.attachments:
+            if (getattr(att, "size", 0) or 0) <= 200_000 and getattr(att, "content_type", "") and "text" in att.content_type:
+                try:
+                    data = await att.read()
+                    prev_text = data.decode("utf-8", errors="replace")[:4000]
+                    break
+                except Exception:
+                    pass
+
+    if not prev_text:
+        return None
+
+    system_prompt = (
+        "You are RedcoatBot. You rewrite messages in the style of a slightly pompous, old-fashioned "
+        "British soldier from the 18th-century colonial era, loosely inspired by red-coated infantry, "
+        "but without quoting or imitating specific lines from any historical documents or media, and "
+        "without claiming to be a real historical figure. Use plain ASCII only.\n\n"
+        "Style guide:\n"
+        "- Use formal, somewhat archaic English: phrases like \"sir\", \"madam\", \"by my honor\", "
+        "\"upon my word\", or \"most improper\", but not all at once.\n"
+        "- Sound loyal, disciplined, and a bit condescending, as if speaking from the perspective of a professional soldier.\n"
+        "- You may occasionally reference the regiment, the Crown, the colonies, or the chain of command, "
+        "but keep these mentions brief.\n"
+        "- Be slightly off-point or melodramatic about minor issues, as if everything is a matter of duty and order.\n"
+        "- Keep 1-2 short sentences; avoid long speeches.\n"
+        "- Punctuation may be a bit formal (commas, semicolons), but avoid being too dense or essay-like.\n"
+        "- Do not add real-world facts; do not name real persons; no emojis; no modern political commentary."
+    )
+
+    user_prompt = (
+        "Rewrite the text below so it sounds like a RedcoatBot-style take: "
+        "formal, slightly pompous 18th-century British soldier tone, a bit overdramatic and off the point, and brief. "
+        "Do not add new info or names. ASCII only.\n\n"
+        f"TEXT:\n{prev_text}"
+    )
+
+
+    resp = await openai.ChatCompletion.acreate(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        temperature=0.9,
+        max_tokens=200,
+    )
+    reply = (resp.choices[0].message["content"] or "").strip()
+
+    return reply or None
 
 
 
