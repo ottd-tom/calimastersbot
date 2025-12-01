@@ -209,7 +209,7 @@ async def yoda_answer(target: discord.Message) -> Optional[str]:
 
 async def wallace_answer(target: discord.Message) -> Optional[str]:
     """
-    Build a jarjar reply
+    Build a wallace reply
     Returns the text reply, or None if no readable text.
     """
     prev_text = (getattr(target, "content", "") or "").strip()
@@ -249,7 +249,7 @@ async def wallace_answer(target: discord.Message) -> Optional[str]:
         "Rewrite the text below so it sounds like a WallaceBot-style take: "
         "friendly, slightly bumbling British inventor energy, a bit off the point, and brief. "
         "Do not add new info or names. ASCII only.\n\n"
-        f\"TEXT:\\n{prev_text}\"
+        f"TEXT:\n{prev_text}"
     )
 
 
