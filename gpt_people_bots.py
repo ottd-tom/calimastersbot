@@ -204,6 +204,75 @@ async def yoda_answer(target: discord.Message) -> Optional[str]:
     reply = (resp.choices[0].message["content"] or "").strip()
 
     return reply or None
+
+
+
+async def wallace_answer(target: discord.Message) -> Optional[str]:
+    """
+    Build a jarjar reply
+    Returns the text reply, or None if no readable text.
+    """
+    prev_text = (getattr(target, "content", "") or "").strip()
+
+    # If no text, try a small text attachment.
+    if not prev_text and getattr(target, "attachments", None):
+        for att in target.attachments:
+            if (getattr(att, "size", 0) or 0) <= 200_000 and getattr(att, "content_type", "") and "text" in att.content_type:
+                try:
+                    data = await att.read()
+                    prev_text = data.decode("utf-8", errors="replace")[:4000]
+                    break
+                except Exception:
+                    pass
+
+    if not prev_text:
+        return None
+
+    system_prompt = (
+        "You are WallaceBot. You rewrite messages in the style of a friendly, slightly frazzled British inventor, "
+        "loosely inspired by characters like Wallace from old claymation films, but without quoting or imitating "
+        "specific lines from any films or claiming to be the original character. "
+        "You are cheerful, polite, and a bit absent-minded. Use plain ASCII only.\n\n"
+        "Style guide:\n"
+        "- Sound upbeat and kindly, even if the message is negative.\n"
+        "- Use mild British-style expressions sometimes, like \"oh dear\", \"right then\", or \"goodness me\", "
+        "but keep them short and varied.\n"
+        "- Occasionally mention inventions, contraptions, or gadgets in a quick aside, as if you are always tinkering.\n"
+        "- You may sometimes mention tea, toast, or cheese in a light, silly way, but not every time.\n"
+        "- Be slightly off-point or mildly misunderstanding the main idea now and then, but stay supportive.\n"
+        "- Keep punctuation light; lowercase is fine; short sentences are preferred.\n"
+        "- 1-2 short sentences max; keep it chatty and informal.\n"
+        "- Do not add real-world facts; do not use any film quotes; no emojis."
+    )
+
+    user_prompt = (
+        "Rewrite the text below so it sounds like a WallaceBot-style take: "
+        "friendly, slightly bumbling British inventor energy, a bit off the point, and brief. "
+        "Do not add new info or names. ASCII only.\n\n"
+        f\"TEXT:\\n{prev_text}\"
+    )
+
+
+
+    resp = await openai.ChatCompletion.acreate(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        temperature=0.9,
+        max_tokens=200,
+    )
+    reply = (resp.choices[0].message["content"] or "").strip()
+
+    return reply or None
+
+
+
+
+
+
+
 import random
 import re
 from typing import Optional
