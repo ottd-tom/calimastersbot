@@ -46,7 +46,7 @@ GEMINI_KEY        = os.getenv("GEMINI_API_KEY")
 
 # League IDs for specific years (used by playerwr command)
 LEAGUE_YEARS = {
-    2026: 'RtgcexBzqjCM'
+    2026: 'RtgcexBzqjCM',
     2025: 'vldWOTsjXggj',
     2024: 'PHGDLQY41V',
     2023: '2F20J0M34C',
