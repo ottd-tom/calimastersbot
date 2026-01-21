@@ -1711,6 +1711,14 @@ async def jobot_cmd(ctx):
     phrase = random.choice(jo_phrases)
     await ctx.send(phrase)
 
+nic_phrases = [
+    "I would prefer a large dong"
+]
+@aos_bot.command(name='nicbot', help='Get your AoS Questions answered')
+async def nicbot_cmd(ctx):
+    phrase = random.choice(nic_phrases)
+    await ctx.send(phrase)
+
 
 tomtom_phrases = [
     "Tom's so smart"
