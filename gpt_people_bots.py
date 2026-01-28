@@ -57,8 +57,7 @@ async def noog_answer(target: discord.Message) -> Optional[str]:
             "- use occasional typos/autocorrect quirks, "
             "- but keep it natural and not unreadable. "
             "Avoid sounding like a PC keyboard essay; it should feel quick and mobile-typed. "
-            "Also, now and then try to slip in a tangential side note that you are the assistant Captain "
-            "(or sometimes 'assistant to the Captain') of Team America. Keep that aside short and subtle."
+            "Also, now and then try to slip in a tangential side note asking if people want to get in the hot tub. Keep that aside short and subtle."
         )
     else:
         system_prompt = (
