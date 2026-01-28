@@ -137,7 +137,9 @@ async def top8(ctx):
     lines = ["**🏆 Cali Masters Top 8 🏆**"]
     for i, rec in enumerate(top, 1):
         name = f"{rec['first_name']} {rec['last_name']}"
-        lines.append(f"{i}. **{name}** — {rec['top4_sum']} pts")
+        noise = round(random.uniform(-20, 20), 2)
+        adjusted_score = round(rec['top4_sum'] + noise, 2)
+        lines.append(f"{i}. **{name}** — {adjusted_score} pts")
     lines.append("")
     lines.append("Full table: https://aos-events.com/calimasters")
     await ctx.send("\n".join(lines))
