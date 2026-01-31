@@ -138,6 +138,7 @@ async def top8(ctx):
     for i, rec in enumerate(top, 1):
         name = f"{rec['first_name']} {rec['last_name']}"
         noise = round(random.uniform(-20, 20), 2)
+        noise = 0 #just comment out this line to add back the random noise
         adjusted_score = round(rec['top4_sum'] + noise, 2)
         lines.append(f"{i}. **{name}** — {adjusted_score} pts")
     lines.append("")
