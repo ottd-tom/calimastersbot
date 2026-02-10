@@ -1709,7 +1709,7 @@ async def ebot_cmd(ctx):
 vallis_responses = {
     "tts": (
         "Check in #⁠tts-aos-looking-for-game\n"
-        "If you can't access that channel, go to ⁠unlock-server-rooms "
+        "If you can't access that channel, go to #⁠unlock-server-rooms "
         "and hit the <:Gargantstomp:799483473596383262> to enable the TTS channels"
     ),
     "nosense": "It's a horrible way to write the rule."
