@@ -1708,8 +1708,8 @@ async def ebot_cmd(ctx):
 
 vallis_responses = {
     "tts": (
-        "For tts, there is a lot of helpful setup info pinned in ⁠<703922401012088833>.  You can find people to play with in <866545623314595881>\n"
-        "If you can't access those channels, go to <846210703949037598>"
+        "For tts, there is a lot of helpful setup info pinned in ⁠<#703922401012088833>.  You can find people to play with in <#866545623314595881>\n"
+        "If you can't access those channels, go to <#846210703949037598>"
         "and hit the <:Gargantstomp:799483473596383262> to enable the TTS channels"
     ),
     "nosense": "It's a horrible way to write the rule."
