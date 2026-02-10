@@ -1706,38 +1706,39 @@ async def ebot_cmd(ctx):
     phrase = random.choice(e_phrases)
     await ctx.send(phrase)
 
-valis_responses = {
+vallis_responses = {
     "tts": (
         "Check in ⁠tts-aos-looking-for-game\n"
         "If you can't access that channel, go to ⁠unlock-server-rooms "
         "and hit the :Gargantstomp: to enable the TTS channels"
     ),
+    "nosense": "It's a horrible way to write the rule."
 
     # future examples
     # "pairings": "Pairings go up after round lock.",
     # "terrain": "Terrain is player-placed following the event pack.",
 }
-@aos_bot.command(name="valisbot", help="valis knows all")
-async def valisbot_cmd(ctx, key: str = None):
+@aos_bot.command(name="vallisbot", help="vallis knows all")
+async def vallisbot_cmd(ctx, key: str = None):
     if key is None:
         await ctx.send(
             "Ask me something specific.\n"
-            "Available topics: " + ", ".join(sorted(valis_responses.keys()))
+            "Available topics: " + ", ".join(sorted(vallis_responses.keys()))
         )
         return
 
     key = key.lower()
 
-    if key in valis_responses:
-        await ctx.send(valis_responses[key])
+    if key in vallis_responses:
+        await ctx.send(vallis_responses[key])
     else:
         await ctx.send(
             f"I know nothing about '{key}'.\n"
-            "Try one of: " + ", ".join(sorted(valis_responses.keys()))
+            "Try one of: " + ", ".join(sorted(vallis_responses.keys()))
         )
 
 
-valis_phrases = [
+jo_phrases = [
     "(Not knowing context since I'm at work, so quick response) I love a good pp",
     "The best thing here. Turns out anal is a cure all"
 ]
