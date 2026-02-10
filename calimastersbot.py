@@ -1706,7 +1706,38 @@ async def ebot_cmd(ctx):
     phrase = random.choice(e_phrases)
     await ctx.send(phrase)
 
-jo_phrases = [
+valis_responses = {
+    "tts": (
+        "Check in ⁠tts-aos-looking-for-game\n"
+        "If you can't access that channel, go to ⁠unlock-server-rooms "
+        "and hit the :Gargantstomp: to enable the TTS channels"
+    ),
+
+    # future examples
+    # "pairings": "Pairings go up after round lock.",
+    # "terrain": "Terrain is player-placed following the event pack.",
+}
+@aos_bot.command(name="valisbot", help="valis knows all")
+async def valisbot_cmd(ctx, key: str = None):
+    if key is None:
+        await ctx.send(
+            "Ask me something specific.\n"
+            "Available topics: " + ", ".join(sorted(valis_responses.keys()))
+        )
+        return
+
+    key = key.lower()
+
+    if key in valis_responses:
+        await ctx.send(valis_responses[key])
+    else:
+        await ctx.send(
+            f"I know nothing about '{key}'.\n"
+            "Try one of: " + ", ".join(sorted(valis_responses.keys()))
+        )
+
+
+valis_phrases = [
     "(Not knowing context since I'm at work, so quick response) I love a good pp",
     "The best thing here. Turns out anal is a cure all"
 ]
@@ -1714,6 +1745,7 @@ jo_phrases = [
 async def jobot_cmd(ctx):
     phrase = random.choice(jo_phrases)
     await ctx.send(phrase)
+
 
 nic_phrases = [
     "I would prefer a large dong"
@@ -1873,49 +1905,7 @@ async def yodabot_cmd(ctx: commands.Context):
         await ctx.send(f":x: Error: {e}")
 
 
-@aos_bot.command(
-    name='wallacebot',
-    help='Repeat the previous message (or the replied-to message) in a dumb, off-point way.'
-)
-async def wallacebot_cmd(ctx: commands.Context):
-    try:
-        target = await _get_target_message(ctx)
-        if not target:
-            await ctx.send(":warning: I could not find a message to mock.")
-            return
 
-        reply = await wallace_answer(target)
-        if not reply:
-            await ctx.send(":warning: That message had no readable text.")
-            return
-
-        out = truncate_content(reply, max_len=1900)
-        await ctx.send(out)
-
-    except Exception as e:
-        await ctx.send(f":x: Error: {e}")
-
-@aos_bot.command(
-    name='redcoatbot',
-    help='Repeat the previous message (or the replied-to message) in a dumb, off-point way.'
-)
-async def wallacebot_cmd(ctx: commands.Context):
-    try:
-        target = await _get_target_message(ctx)
-        if not target:
-            await ctx.send(":warning: I could not find a message to mock.")
-            return
-
-        reply = await redcoat_answer(target)
-        if not reply:
-            await ctx.send(":warning: That message had no readable text.")
-            return
-
-        out = truncate_content(reply, max_len=1900)
-        await ctx.send(out)
-
-    except Exception as e:
-        await ctx.send(f":x: Error: {e}")
 
 @aos_bot.command(
     name='noebot',
