@@ -1729,7 +1729,7 @@ vallis_responses = {
         "fighting resets to the active player after the strike-first units are done. So you can wind up with three activations in a row."
     ),
     "fighttwice": (
-        "Fight twice abilities typically give the unit strike-last for their second fight."  
+        "Fight twice abilities typically give the unit strike-last for their second fight. "  
         "If the unit has strike-first at the same time, which usually lasts for the rest of the turn, the unit will get strike-first for the first fight. "
         "For the second fight, strike-first is cancelled out by strike-last, so the unit will fight with normal timing."
     ),
