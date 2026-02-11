@@ -1706,13 +1706,60 @@ async def ebot_cmd(ctx):
     phrase = random.choice(e_phrases)
     await ctx.send(phrase)
 
+
+# Channel mentions
+UNLOCK_CHANNEL      = "<#846210703949037598>"
+TTS_PLAY_CHANNEL    = "<#866545623314595881>"
+TTS_HELP_CHANNEL    = "<#703922401012088833>"
+
+# Emoji mentions
+EMOJI_GARGANT       = "<:Gargantstomp:799483473596383262>"
+EMOJI_COOLCAST      = "<:CoolCast:695763331570597958>"
+EMOJI_ROCKHORROR    = "<:RockHorror:695129181956210688>"
+EMOJI_DABADMOON     = "<:DABADMOON:717233975910727711>"
+EMOJI_PETRIFEX      = "<:LaughsInPetrifex:687778273434009601>"
+
+
+
 vallis_responses = {
+
     "tts": (
-        "For tts, there is a lot of helpful setup info pinned in ⁠<#703922401012088833>.  You can find people to play with in <#866545623314595881>\n"
-        "If you can't access those channels, go to <#846210703949037598>"
-        "and hit the <:Gargantstomp:799483473596383262> to enable the TTS channels"
+        f"For TTS, there is a lot of helpful setup info pinned in {TTS_HELP_CHANNEL}.  "
+        f"You can find people to play with in {TTS_PLAY_CHANNEL}\n"
+        f"If you can't access those channels, go to {UNLOCK_CHANNEL} "
+        f"and hit the {EMOJI_GARGANT} to enable the TTS channels"
     ),
+
+    "order": (
+        "People in this channel will help if they can, but you'll find more people "
+        "familiar with your army in the faction's specific channel.\n\n"
+        f"If you can't access that channel, go to {UNLOCK_CHANNEL} "
+        f"and hit the {EMOJI_COOLCAST} emote to get access to ORDER channels."
+    ),
+
+    "chaos": (
+        "People in this channel will help if they can, but you'll find more people "
+        "familiar with your army in the faction's specific channel.\n\n"
+        f"If you can't access that channel, go to {UNLOCK_CHANNEL} "
+        f"and hit the {EMOJI_ROCKHORROR} emote to get access to CHAOS channels."
+    ),
+
+    "destruction": (
+        "People in this channel will help if they can, but you'll find more people "
+        "familiar with your army in the faction's specific channel.\n\n"
+        f"If you can't access that channel, go to {UNLOCK_CHANNEL} "
+        f"and hit the {EMOJI_DABADMOON} emote to get access to DESTRUCTION channels."
+    ),
+
+    "death": (
+        "People in this channel will help if they can, but you'll find more people "
+        "familiar with your army in the faction's specific channel.\n\n"
+        f"If you can't access that channel, go to {UNLOCK_CHANNEL} "
+        f"and hit the {EMOJI_PETRIFEX} emote to get access to DEATH channels."
+    ),
+
     "nosense": "It's a horrible way to write the rule.",
+
     "chainfight": (
         "There are actually a few questions about chain fighting a strike-first. "
         "There's the classic \"can I pull my non-strike-first unit into the strike-first phase?\" "
@@ -1728,16 +1775,15 @@ vallis_responses = {
         "strike-first units. Afterwards, you get to activate again with your first regularly timed fight, since the alternating "
         "fighting resets to the active player after the strike-first units are done. So you can wind up with three activations in a row."
     ),
+
     "fighttwice": (
-        "Fight twice abilities typically give the unit strike-last for their second fight. "  
-        "If the unit has strike-first at the same time, which usually lasts for the rest of the turn, the unit will get strike-first for the first fight. "
+        "Fight twice abilities typically give the unit strike-last for their second fight. "
+        "If the unit has strike-first at the same time, which usually lasts for the rest of the turn, "
+        "the unit will get strike-first for the first fight. "
         "For the second fight, strike-first is cancelled out by strike-last, so the unit will fight with normal timing."
     ),
-
-    # future examples
-    # "pairings": "Pairings go up after round lock.",
-    # "terrain": "Terrain is player-placed following the event pack.",
 }
+
 @aos_bot.command(name="vallisbot", help="vallis knows all")
 async def vallisbot_cmd(ctx, key: str = None):
     if key is None:
