@@ -1712,7 +1712,27 @@ vallis_responses = {
         "If you can't access those channels, go to <#846210703949037598>"
         "and hit the <:Gargantstomp:799483473596383262> to enable the TTS channels"
     ),
-    "nosense": "It's a horrible way to write the rule."
+    "nosense": "It's a horrible way to write the rule.",
+    "chainfight": (
+        "There are actually a few questions about chain fighting a strike-first. "
+        "There's the classic \"can I pull my non-strike-first unit into the strike-first phase?\" "
+        "and the \"If I'm the active player and my strike-first unit chain fights, can I get three activations in a row?\"\n\n"
+        "Here's the first one:\n"
+        "Chain fighting abilities let you change the timing of when another fight-eligible unit can fight, "
+        "but it cannot override strike-first or strike-last. If the unit that uses the chain fighting ability has strike-first, "
+        "a non-strike-first unit can chain fight only if neither player has any more strike-first units. Likewise, a strike-last unit "
+        "can chain fight only if only strike-last units are left to fight on either side.\n\n"
+        "Here's the second:\n"
+        "If you're the active player and you have a strike-first unit with a chain fighting ability, "
+        "you can make a non-strike-first unit fight immediately after your strike-first unit, as long as no player has any other "
+        "strike-first units. Afterwards, you get to activate again with your first regularly timed fight, since the alternating "
+        "fighting resets to the active player after the strike-first units are done. So you can wind up with three activations in a row."
+    ),
+    "fighttwice": (
+        "Fight twice abilities typically give the unit strike-last for their second fight.  
+        If the unit has strike-first at the same time, which usually lasts for the rest of the turn, the unit will get strike-first for the first fight. 
+        For the second fight, strike-first is cancelled out by strike-last, so the unit will fight with normal timing."
+    ),
 
     # future examples
     # "pairings": "Pairings go up after round lock.",
