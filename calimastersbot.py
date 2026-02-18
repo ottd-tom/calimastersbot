@@ -2337,7 +2337,7 @@ async def on_message(message: discord.Message):
             await message.channel.send("Best Coast Pairings sucks")
 
     # --- SECTION 2: New Functionality (Event Link Listener) ---
-    if message.guild is not None and message.guild.id == MASTERS_GUILD_ID:
+    if message.guild is not None and message.guild.id == SOCAL_AOS_GUILD_ID:
         # Regex to find the BCP event ID
         match = re.search(r"bestcoastpairings\.com/event/([a-zA-Z0-9]+)", message.content)
         
@@ -2371,7 +2371,7 @@ async def on_message(message: discord.Message):
                     announcement = response.choices[0].message.content
                     
                     # Post to the Masters announcement channel
-                    announcement_chan = aos_bot.get_channel(ANNOUNCEMENT_CHANNEL_ID)
+                    announcement_chan = aos_bot.get_channel(EVENT_CHANNEL_ID)
                     if announcement_chan:
                         await announcement_chan.send(announcement)
             except Exception as e:
