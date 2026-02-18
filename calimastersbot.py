@@ -2311,12 +2311,7 @@ TARGET_USER_ID = 684591023678292010  # Barker
 SOCAL_AOS_GUILD_ID = 1258302667403563118
 EVENT_CHANNEL_ID = 1377378362842157238
 
-BCP_HEADERS = {
-    "Accept": "application/json",
-    "x-api-key": "49cb621b-f75e-4ab3-b8ad-62cb89a85964",
-    "client-id": "roster-stats",
-}
-
+USER_AGENT = "AoS-California-Masters"
 
 @aos_bot.event
 async def on_message(message: discord.Message):
@@ -2335,8 +2330,8 @@ async def on_message(message: discord.Message):
                 bcp_url = f"https://newprod-api.bestcoastpairings.com/v1/events/{event_id}"
                 headers = {
                     "Accept": "application/json",
-                    "x-api-key": API_KEY,
-                    "client-id": CLIENT_ID,
+                    "x-api-key": BCP_API_KEY,
+                    "client-id": "roster-stats",
                     "User-Agent": USER_AGENT,
                 }
 
