@@ -2307,31 +2307,87 @@ TARGET_USER_ID = 684591023678292010  # Barker
 #TARGET_GUILD_ID = 940470229732032583  # test discord
 #TARGET_USER_ID = 199725130337878017  # me
 
+
+SOCAL_AOS_GUILD_ID = 1258302667403563118
+EVENT_CHANNEL_ID = 1377378362842157238
+
+BCP_HEADERS = {
+    "Accept": "application/json",
+    "x-api-key": "49cb621b-f75e-4ab3-b8ad-62cb89a85964",
+    "client-id": "roster-stats",
+}
+
+
 @aos_bot.event
 async def on_message(message: discord.Message):
-    # Always ignore other bots (including yourself)
     if message.author.bot:
         return
 
-    # Only act in the specific server and for the specific user
+    # --- SECTION 1: Your Existing Logic (Socal Discord / Barker) ---
     if (
         message.guild is not None
         and message.guild.id == TARGET_GUILD_ID
         and message.author.id == TARGET_USER_ID
     ):
-        # Check if "BCP" is mentioned (case-insensitive)
         content = message.content.lower()
-        
-        # remove all spaces
         normalized = re.sub(r"\s+", "", content)        
         if "bcp" in normalized:
             await message.channel.send("BCP sucks")
-
-        if "best coast pairings" in message.content.lower():
+        if "best coast pairings" in content:
             await message.channel.send("Best Coast Pairings sucks")
 
-    # Important: let commands still work if you use commands extension
+    # --- SECTION 2: New Functionality (Event Link Listener) ---
+    if message.guild is not None and message.guild.id == MASTERS_GUILD_ID:
+        # Regex to find the BCP event ID
+        match = re.search(r"bestcoastpairings\.com/event/([a-zA-Z0-9]+)", message.content)
+        
+        if match:
+            event_id = match.group(1)
+            # Use the API logic from your California Masters script
+            url = f"https://newprod-api.bestcoastpairings.com/v1/events/{event_id}"
+            
+            try:
+                resp = requests.get(url, headers=BCP_HEADERS, timeout=10)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    event_date = data.get("eventDate", "").split('T')[0] # Get YYYY-MM-DD
+                    city = data.get("city", "the area")
+
+                    # GPT Prompt for the pompous teenager persona
+                    prompt = (
+                        f"You are a pompous, arrogant, full-of-themselves teenager. "
+                        f"You just saw someone post an event in {city} on {event_date}. "
+                        f"Announce that YOU are thinking of running a much better event "
+                        f"on that same day in the same city. Be casual, full of yourself, "
+                        f"and dismissive of other events. Keep it short."
+                    )
+
+                    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+                    response = client.chat.completions.create(
+                        model="gpt-4o",
+                        messages=[{"role": "user", "content": prompt}]
+                    )
+                    
+                    announcement = response.choices[0].message.content
+                    
+                    # Post to the Masters announcement channel
+                    announcement_chan = aos_bot.get_channel(ANNOUNCEMENT_CHANNEL_ID)
+                    if announcement_chan:
+                        await announcement_chan.send(announcement)
+            except Exception as e:
+                print(f"Error processing BCP link: {e}")
+
     await aos_bot.process_commands(message)
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2409,6 +2465,9 @@ async def run_bot(bot, token, name, initial_delay=0):
     finally:
         # Ensure clean shutdown if connect() ever exits
         await bot.close()
+
+
+
 
 async def main():
     if not token_leaderboard or not token_aos or not token_texas:
