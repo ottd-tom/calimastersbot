@@ -2320,76 +2320,62 @@ BCP_HEADERS = {
 
 @aos_bot.event
 async def on_message(message: discord.Message):
-    if message.author.bot:
+    # 1. Basic Safety
+    if message.author.bot or message.guild is None:
         return
 
-    # --- DEBUG: See every message the bot hears in your logs ---
-    # print(f"Seen in {message.guild.id if message.guild else 'DM'}: {message.content[:50]}")
-
-    # 1. BARKER LOGIC (Existing)
-    if message.guild and message.guild.id == TARGET_GUILD_ID and message.author.id == TARGET_USER_ID:
+    # 2. Existing Barker/Socal Logic (Target Guild: 803881553108795413)
+    if message.guild.id == 803881553108795413 and message.author.id == 684591023678292010:
         content_low = message.content.lower()
-        if "bcp" in re.sub(r"\s+", "", content_low) or "best coast pairings" in content_low:
+        normalized = re.sub(r"\s+", "", content_low)
+        if "bcp" in normalized or "best coast pairings" in content_low:
             await message.channel.send("BCP sucks")
 
-    # 2. MASTERS EVENT LOGIC
-    # Ensure this ID is an Integer, not a String
-    if message.guild and message.guild.id == 940470229732032583:
-        
-        # Improved Regex: Handles trailing slashes or query strings
+    # 3. New Event Listener Logic (Target Guild: 1258302667403563118)
+    if message.guild.id == 1258302667403563118:
+        # Check for the link
         match = re.search(r"bestcoastpairings\.com/event/([a-zA-Z0-9]+)", message.content)
-        
         if match:
             event_id = match.group(1)
-            print(f"Found BCP ID: {event_id}. Fetching metadata...")
-
-            # Fetch from BCP
-            url = f"https://newprod-api.bestcoastpairings.com/v1/events/{event_id}"
+            # Use aiohttp to fetch (already in your bot.py imports)
+            bcp_url = f"https://newprod-api.bestcoastpairings.com/v1/events/{event_id}"
             headers = {
                 "Accept": "application/json",
                 "x-api-key": "49cb621b-f75e-4ab3-b8ad-62cb89a85964",
-                "client-id": "roster-stats",
+                "client-id": "roster-stats"
             }
             
-            try:
-                resp = requests.get(url, headers=headers, timeout=10)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    city = data.get("city", "the area")
-                    # Formatting date from '2026-01-16T09:00:00' to 'Jan 16'
-                    raw_date = data.get("eventDate", "")
-                    clean_date = raw_date.split('T')[0] if raw_date else "the same day"
+            async with aiohttp.ClientSession() as session:
+                async with session.get(bcp_url, headers=headers) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        city = data.get("city", "the area")
+                        raw_date = data.get("eventDate", "")
+                        # Format date to something like "Jan 16"
+                        clean_date = raw_date.split('T')[0] if raw_date else "that day"
 
-                    # OpenAI Call
-                    prompt = (
-                        f"You are a pompous, arrogant teenager who thinks you are the best TO. "
-                        f"Someone just posted an event in {city} on {clean_date}. "
-                        f"Casually mention you've been thinking of running your own way better event "
-                        f"in {city} on that same day. Be short, dismissive, and full of yourself."
-                    )
-                    
-                    response = client.chat.completions.create(
-                        model="gpt-4o",
-                        messages=[{"role": "user", "content": prompt}]
-                    )
-                    announcement = response.choices[0].message.content
-                    
-                    # Targeting the specific announcement channel
-                    target_chan_id = 940470229732032586
-                    channel = aos_bot.get_channel(target_chan_id)
-                    
-                    # Fallback if channel isn't in cache
-                    if not channel:
-                        channel = await aos_bot.fetch_channel(target_chan_id)
-                    
-                    await channel.send(announcement)
-                    print("Successfully sent pompous announcement.")
-                else:
-                    print(f"BCP API Error: Status {resp.status_code}")
-            except Exception as e:
-                print(f"Critical error in BCP/OpenAI flow: {e}")
+                        # OpenAI Call
+                        prompt = (
+                            f"You are a pompous, arrogant teenager who thinks you are the best TO in the world. "
+                            f"Someone just posted an event in {city} on {clean_date}. "
+                            f"Casually mention you've been thinking of running your own way better event "
+                            f"in {city} on that same day. Be short, dismissive, and full of yourself."
+                        )
 
-    # 3. PROCESS COMMANDS
+                        # Using the OpenAI key from your environment
+                        openai_client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+                        response = openai_client.chat.completions.create(
+                            model="gpt-4o",
+                            messages=[{"role": "user", "content": prompt}]
+                        )
+                        announcement = response.choices[0].message.content
+
+                        # Post to the target channel (1377378362842157238)
+                        target_chan = aos_bot.get_channel(1377378362842157238)
+                        if target_chan:
+                            await target_chan.send(announcement)
+
+    # 4. Crucial: Allow commands to work
     await aos_bot.process_commands(message)
 
 
