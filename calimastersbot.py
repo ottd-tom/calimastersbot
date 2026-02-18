@@ -2334,7 +2334,7 @@ async def on_message(message: discord.Message):
 
     # 2. MASTERS EVENT LOGIC
     # Ensure this ID is an Integer, not a String
-    if message.guild and message.guild.id == 1258302667403563118:
+    if message.guild and message.guild.id == 940470229732032583:
         
         # Improved Regex: Handles trailing slashes or query strings
         match = re.search(r"bestcoastpairings\.com/event/([a-zA-Z0-9]+)", message.content)
@@ -2375,7 +2375,7 @@ async def on_message(message: discord.Message):
                     announcement = response.choices[0].message.content
                     
                     # Targeting the specific announcement channel
-                    target_chan_id = 1377378362842157238
+                    target_chan_id = 940470229732032586
                     channel = aos_bot.get_channel(target_chan_id)
                     
                     # Fallback if channel isn't in cache
