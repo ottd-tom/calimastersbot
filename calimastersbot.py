@@ -2319,10 +2319,9 @@ async def on_message(message: discord.Message):
 
     # --- BLOCK A ---
     if message.guild.id == SOCAL_AOS_GUILD_ID:
-    
         match = re.search(r"bestcoastpairings\.com/event/([a-zA-Z0-9]+)", message.content)
         if match:
-              try:
+            try:
                 event_id = match.group(1)
                 bcp_url = f"https://newprod-api.bestcoastpairings.com/v1/events/{event_id}"
                 headers = {
@@ -2345,11 +2344,10 @@ async def on_message(message: discord.Message):
                                 clean_date = dt_obj.strftime("%b %d")
 
                             prompt = (
-                                f"You are a pompous, arrogant, full-of-themselves teenager. "
-                                f"You just saw someone post an event in {city} on {clean_date}. "
-                                f"Announce that YOU are thinking of running a much better event "
-                                f"on that same day in the same city. No links. Sound like a bratty teen TO. "
-                                f"Keep it short, e.g., 'I've been thinking of running an event on {clean_date} in {city}.'"
+                                f"You are a pompous, arrogant, full-of-themselves teenager who thinks they are the best TO in the world. "
+                                f"Announce that YOU are thinking of running an amazing event on {clean_date} in {city}. "
+                                f"Don't reference or acknowledge any other event. Just talk about your own amazing event. "
+                                f"Sound like a bratty teen TO. Keep it short. Do not use emoji."
                             )
                             response = openai.ChatCompletion.create(
                                 model="gpt-4o",
