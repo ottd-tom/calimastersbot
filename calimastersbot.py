@@ -2381,6 +2381,9 @@ async def on_message(message: discord.Message):
                                 logging.warning("[BCP] Target channel not found")
                             except discord.Forbidden:
                                 logging.warning("[BCP] Bot lacks permission to post in target channel")
+
+            except Exception as e:
+                logging.exception(f"[BCP] Handler failed: {e}")
         else:
             logging.info(f"[BCP] No BCP link found in message")
 
