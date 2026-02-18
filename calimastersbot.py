@@ -2335,8 +2335,9 @@ async def on_message(message: discord.Message):
                 bcp_url = f"https://newprod-api.bestcoastpairings.com/v1/events/{event_id}"
                 headers = {
                     "Accept": "application/json",
-                    "x-api-key": "49cb621b-f75e-4ab3-b8ad-62cb89a85964",
-                    "client-id": "roster-stats"
+                    "x-api-key": API_KEY,
+                    "client-id": CLIENT_ID,
+                    "User-Agent": USER_AGENT,
                 }
 
                 timeout = aiohttp.ClientTimeout(total=10)
