@@ -2369,11 +2369,15 @@ async def on_message(message: discord.Message):
                             announcement = response.choices[0].message.content
 
                             # Channel ID: 1377378362842157238
-                            target_chan = aos_bot.get_channel(1377378362842157238)
-                            if target_chan:
+                            try:
+                                target_chan = await aos_bot.fetch_channel(1377378362842157238)
                                 await target_chan.send(announcement)
-            except Exception as e:
-                logging.error(f"Event Listener Error: {e}")
+                            except discord.NotFound:
+                                logging.warning("Target channel not found")
+                            except discord.Forbidden:
+                                logging.warning("Bot lacks permission to post in target channel")
+                                        except Exception as e:
+                                            logging.error(f"Event Listener Error: {e}")
 
     # --- BLOCK B: EXISTING BARKER / SOCAL LOGIC ---
     # Target Guild: 803881553108795413, Target User: 684591023678292010
