@@ -2323,60 +2323,73 @@ async def on_message(message: discord.Message):
     if message.author.bot:
         return
 
-    # --- SECTION 1: Your Existing Logic (Socal Discord / Barker) ---
-    if (
-        message.guild is not None
-        and message.guild.id == TARGET_GUILD_ID
-        and message.author.id == TARGET_USER_ID
-    ):
-        content = message.content.lower()
-        normalized = re.sub(r"\s+", "", content)        
-        if "bcp" in normalized:
-            await message.channel.send("BCP sucks")
-        if "best coast pairings" in content:
-            await message.channel.send("Best Coast Pairings sucks")
+    # --- DEBUG: See every message the bot hears in your logs ---
+    # print(f"Seen in {message.guild.id if message.guild else 'DM'}: {message.content[:50]}")
 
-    # --- SECTION 2: New Functionality (Event Link Listener) ---
-    if message.guild is not None and message.guild.id == SOCAL_AOS_GUILD_ID:
-        # Regex to find the BCP event ID
+    # 1. BARKER LOGIC (Existing)
+    if message.guild and message.guild.id == TARGET_GUILD_ID and message.author.id == TARGET_USER_ID:
+        content_low = message.content.lower()
+        if "bcp" in re.sub(r"\s+", "", content_low) or "best coast pairings" in content_low:
+            await message.channel.send("BCP sucks")
+
+    # 2. MASTERS EVENT LOGIC
+    # Ensure this ID is an Integer, not a String
+    if message.guild and message.guild.id == 1258302667403563118:
+        
+        # Improved Regex: Handles trailing slashes or query strings
         match = re.search(r"bestcoastpairings\.com/event/([a-zA-Z0-9]+)", message.content)
         
         if match:
             event_id = match.group(1)
-            # Use the API logic from your California Masters script
+            print(f"Found BCP ID: {event_id}. Fetching metadata...")
+
+            # Fetch from BCP
             url = f"https://newprod-api.bestcoastpairings.com/v1/events/{event_id}"
+            headers = {
+                "Accept": "application/json",
+                "x-api-key": "49cb621b-f75e-4ab3-b8ad-62cb89a85964",
+                "client-id": "roster-stats",
+            }
             
             try:
-                resp = requests.get(url, headers=BCP_HEADERS, timeout=10)
+                resp = requests.get(url, headers=headers, timeout=10)
                 if resp.status_code == 200:
                     data = resp.json()
-                    event_date = data.get("eventDate", "").split('T')[0] # Get YYYY-MM-DD
                     city = data.get("city", "the area")
+                    # Formatting date from '2026-01-16T09:00:00' to 'Jan 16'
+                    raw_date = data.get("eventDate", "")
+                    clean_date = raw_date.split('T')[0] if raw_date else "the same day"
 
-                    # GPT Prompt for the pompous teenager persona
+                    # OpenAI Call
                     prompt = (
-                        f"You are a pompous, arrogant, full-of-themselves teenager. "
-                        f"You just saw someone post an event in {city} on {event_date}. "
-                        f"Announce that YOU are thinking of running a much better event "
-                        f"on that same day in the same city. Be casual, full of yourself, "
-                        f"and dismissive of other events. Keep it short."
+                        f"You are a pompous, arrogant teenager who thinks you are the best TO. "
+                        f"Someone just posted an event in {city} on {clean_date}. "
+                        f"Casually mention you've been thinking of running your own way better event "
+                        f"in {city} on that same day. Be short, dismissive, and full of yourself."
                     )
-
-                    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+                    
                     response = client.chat.completions.create(
                         model="gpt-4o",
                         messages=[{"role": "user", "content": prompt}]
                     )
-                    
                     announcement = response.choices[0].message.content
                     
-                    # Post to the Masters announcement channel
-                    announcement_chan = aos_bot.get_channel(EVENT_CHANNEL_ID)
-                    if announcement_chan:
-                        await announcement_chan.send(announcement)
+                    # Targeting the specific announcement channel
+                    target_chan_id = 1377378362842157238
+                    channel = aos_bot.get_channel(target_chan_id)
+                    
+                    # Fallback if channel isn't in cache
+                    if not channel:
+                        channel = await aos_bot.fetch_channel(target_chan_id)
+                    
+                    await channel.send(announcement)
+                    print("Successfully sent pompous announcement.")
+                else:
+                    print(f"BCP API Error: Status {resp.status_code}")
             except Exception as e:
-                print(f"Error processing BCP link: {e}")
+                print(f"Critical error in BCP/OpenAI flow: {e}")
 
+    # 3. PROCESS COMMANDS
     await aos_bot.process_commands(message)
 
 
