@@ -2372,10 +2372,12 @@ async def on_message(message: discord.Message):
                             try:
                                 target_chan = await aos_bot.fetch_channel(1377378362842157238)
                                 await target_chan.send(announcement)
-                            except discord.NotFound:
-                                logging.warning("Target channel not found")
-                            except discord.Forbidden:
-                                logging.warning("Bot lacks permission to post in target channel")
+            except discord.NotFound:
+                logging.warning("Target channel not found")
+            except discord.Forbidden:
+                logging.warning("Bot lacks permission to post in target channel")
+            except Exception as e:
+                logging.exception(f"BCP handler failed: {e}")
 
     # --- BLOCK B: EXISTING BARKER / SOCAL LOGIC ---
     # Target Guild: 803881553108795413, Target User: 684591023678292010
