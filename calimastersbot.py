@@ -2307,9 +2307,8 @@ TARGET_USER_ID = 684591023678292010  # Barker
 #TARGET_GUILD_ID = 940470229732032583  # test discord
 #TARGET_USER_ID = 199725130337878017  # me
 
-
-SOCAL_AOS_GUILD_ID = 1258302667403563118
-EVENT_CHANNEL_ID = 1377378362842157238
+SOCAL_AOS_GUILD_ID = 803881553108795413
+EVENT_CHANNEL_ID = 1213278301154447420
 
 USER_AGENT = "AoS-California-Masters"
 
@@ -2319,13 +2318,11 @@ async def on_message(message: discord.Message):
         return
 
     # --- BLOCK A ---
-    if message.guild.id == 1258302667403563118:
-        logging.info(f"[BCP] Message received in target guild from {message.author}: {message.content[:100]}")
-        
+    if message.guild.id == SOCAL_AOS_GUILD_ID:
+    
         match = re.search(r"bestcoastpairings\.com/event/([a-zA-Z0-9]+)", message.content)
         if match:
-            logging.info(f"[BCP] Link matched! event_id={match.group(1)}")
-            try:
+              try:
                 event_id = match.group(1)
                 bcp_url = f"https://newprod-api.bestcoastpairings.com/v1/events/{event_id}"
                 headers = {
@@ -2338,17 +2335,14 @@ async def on_message(message: discord.Message):
                 timeout = aiohttp.ClientTimeout(total=10)
                 async with aiohttp.ClientSession() as session:
                     async with session.get(bcp_url, headers=headers, timeout=timeout) as resp:
-                        logging.info(f"[BCP] API response status: {resp.status}")
                         if resp.status == 200:
                             data = await resp.json()
-                            logging.info(f"[BCP] Event data: {data}")
                             city = data.get("city", "the area")
                             raw_date = data.get("eventDate", "")
                             clean_date = "that day"
                             if raw_date:
                                 dt_obj = datetime.fromisoformat(raw_date.replace('Z', ''))
                                 clean_date = dt_obj.strftime("%b %d")
-                            logging.info(f"[BCP] city={city}, clean_date={clean_date}")
 
                             prompt = (
                                 f"You are a pompous, arrogant, full-of-themselves teenager. "
@@ -2357,20 +2351,14 @@ async def on_message(message: discord.Message):
                                 f"on that same day in the same city. No links. Sound like a bratty teen TO. "
                                 f"Keep it short, e.g., 'I've been thinking of running an event on {clean_date} in {city}.'"
                             )
-                            logging.info(f"[BCP] Calling OpenAI...")
                             response = openai.ChatCompletion.create(
                                 model="gpt-4o",
                                 messages=[{"role": "user", "content": prompt}]
                             )
-                            announcement = response["choices"][0]["message"]["content"]
-                            logging.info(f"[BCP] OpenAI response: {announcement}")
-
-                            logging.info(f"[BCP] Fetching channel 1377378362842157238...")
+                            announcement = "NoogTOBot: " + response["choices"][0]["message"]["content"]
                             try:
-                                target_chan = await aos_bot.fetch_channel(1377378362842157238)
-                                logging.info(f"[BCP] Got channel: {target_chan}")
+                                target_chan = await aos_bot.fetch_channel(EVENT_CHANNEL_ID)
                                 await target_chan.send(announcement)
-                                logging.info(f"[BCP] Message sent successfully!")
                             except discord.NotFound:
                                 logging.warning("[BCP] Target channel not found")
                             except discord.Forbidden:
@@ -2378,8 +2366,6 @@ async def on_message(message: discord.Message):
 
             except Exception as e:
                 logging.exception(f"[BCP] Handler failed: {e}")
-        else:
-            logging.info(f"[BCP] No BCP link found in message")
 
     # --- BLOCK B ---
     if message.guild.id == 803881553108795413 and message.author.id == 684591023678292010:
