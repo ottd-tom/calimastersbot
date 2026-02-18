@@ -2320,78 +2320,78 @@ BCP_HEADERS = {
 
 @aos_bot.event
 async def on_message(message: discord.Message):
-    # 1. Standard Guard
     if message.author.bot or message.guild is None:
         return
 
-    # --- BLOCK A: NEW MASTERS EVENT LISTENER ---
+    # --- BLOCK A ---
     if message.guild.id == 1258302667403563118:
+        logging.info(f"[BCP] Message received in target guild from {message.author}: {message.content[:100]}")
+        
         match = re.search(r"bestcoastpairings\.com/event/([a-zA-Z0-9]+)", message.content)
         if match:
-            event_id = match.group(1)
-            bcp_url = f"https://newprod-api.bestcoastpairings.com/v1/events/{event_id}"
-            headers = {
-                "Accept": "application/json",
-                "x-api-key": "49cb621b-f75e-4ab3-b8ad-62cb89a85964",
-                "client-id": "roster-stats"
-            }
-            
-            # Start TRY at the very beginning of the risky work
+            logging.info(f"[BCP] Link matched! event_id={match.group(1)}")
             try:
+                event_id = match.group(1)
+                bcp_url = f"https://newprod-api.bestcoastpairings.com/v1/events/{event_id}"
+                headers = {
+                    "Accept": "application/json",
+                    "x-api-key": "49cb621b-f75e-4ab3-b8ad-62cb89a85964",
+                    "client-id": "roster-stats"
+                }
+
+                timeout = aiohttp.ClientTimeout(total=10)
                 async with aiohttp.ClientSession() as session:
-                    async with session.get(bcp_url, headers=headers, timeout=10) as resp:
+                    async with session.get(bcp_url, headers=headers, timeout=timeout) as resp:
+                        logging.info(f"[BCP] API response status: {resp.status}")
                         if resp.status == 200:
                             data = await resp.json()
+                            logging.info(f"[BCP] Event data: {data}")
                             city = data.get("city", "the area")
                             raw_date = data.get("eventDate", "")
-                            
                             clean_date = "that day"
                             if raw_date:
                                 dt_obj = datetime.fromisoformat(raw_date.replace('Z', ''))
                                 clean_date = dt_obj.strftime("%b %d")
+                            logging.info(f"[BCP] city={city}, clean_date={clean_date}")
 
-                            # --- ASYNC OPENAI CALL ---
-                            from openai import AsyncOpenAI
-                            client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-                            
+                            from openai import OpenAI
+                            client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
                             prompt = (
                                 f"You are a pompous, arrogant, full-of-themselves teenager. "
                                 f"You just saw someone post an event in {city} on {clean_date}. "
                                 f"Announce that YOU are thinking of running a much better event "
                                 f"on that same day in the same city. No links. Sound like a bratty teen TO. "
-                                f"Keep it short."
+                                f"Keep it short, e.g., 'I've been thinking of running an event on {clean_date} in {city}.'"
                             )
-
-                            # Notice the 'await' here
-                            response = await client.chat.completions.create(
+                            logging.info(f"[BCP] Calling OpenAI...")
+                            response = client.chat.completions.create(
                                 model="gpt-4o",
                                 messages=[{"role": "user", "content": prompt}]
                             )
                             announcement = response.choices[0].message.content
+                            logging.info(f"[BCP] OpenAI response: {announcement}")
 
-                            # Post to Target Channel
-                            target_chan = await aos_bot.fetch_channel(1377378362842157238)
-                            await target_chan.send(announcement)
-                        else:
-                            logging.warning(f"BCP API returned status: {resp.status}")
+                            logging.info(f"[BCP] Fetching channel 1377378362842157238...")
+                            try:
+                                target_chan = await aos_bot.fetch_channel(1377378362842157238)
+                                logging.info(f"[BCP] Got channel: {target_chan}")
+                                await target_chan.send(announcement)
+                                logging.info(f"[BCP] Message sent successfully!")
+                            except discord.NotFound:
+                                logging.warning("[BCP] Target channel not found")
+                            except discord.Forbidden:
+                                logging.warning("[BCP] Bot lacks permission to post in target channel")
+        else:
+            logging.info(f"[BCP] No BCP link found in message")
 
-            except discord.NotFound:
-                logging.warning("Target channel not found")
-            except discord.Forbidden:
-                logging.warning("Bot lacks permission to post in target channel")
-            except Exception as e:
-                logging.exception(f"BCP handler failed: {e}")
-
-    # --- BLOCK B: EXISTING BARKER / SOCAL LOGIC ---
+    # --- BLOCK B ---
     if message.guild.id == 803881553108795413 and message.author.id == 684591023678292010:
         content_low = message.content.lower()
         normalized = re.sub(r"\s+", "", content_low)
         if "bcp" in normalized or "best coast pairings" in content_low:
             await message.channel.send("BCP sucks")
 
-    # 3. Process commands
     await aos_bot.process_commands(message)
-
 
 
 
