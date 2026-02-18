@@ -2350,7 +2350,6 @@ async def on_message(message: discord.Message):
                                 clean_date = dt_obj.strftime("%b %d")
                             logging.info(f"[BCP] city={city}, clean_date={clean_date}")
 
-                            from openai import OpenAI
                             client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
                             prompt = (
                                 f"You are a pompous, arrogant, full-of-themselves teenager. "
