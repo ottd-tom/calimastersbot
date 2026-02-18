@@ -2360,11 +2360,11 @@ async def on_message(message: discord.Message):
                                 f"Keep it short, e.g., 'I've been thinking of running an event on {clean_date} in {city}.'"
                             )
                             logging.info(f"[BCP] Calling OpenAI...")
-                            response = client.chat.completions.create(
+                            response = openai.ChatCompletion.create(
                                 model="gpt-4o",
                                 messages=[{"role": "user", "content": prompt}]
                             )
-                            announcement = response.choices[0].message.content
+                            announcement = response["choices"][0]["message"]["content"]
                             logging.info(f"[BCP] OpenAI response: {announcement}")
 
                             logging.info(f"[BCP] Fetching channel 1377378362842157238...")
