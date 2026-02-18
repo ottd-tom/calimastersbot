@@ -2376,8 +2376,6 @@ async def on_message(message: discord.Message):
                                 logging.warning("Target channel not found")
                             except discord.Forbidden:
                                 logging.warning("Bot lacks permission to post in target channel")
-                                        except Exception as e:
-                                            logging.error(f"Event Listener Error: {e}")
 
     # --- BLOCK B: EXISTING BARKER / SOCAL LOGIC ---
     # Target Guild: 803881553108795413, Target User: 684591023678292010
