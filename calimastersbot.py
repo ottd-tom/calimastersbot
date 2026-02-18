@@ -2324,19 +2324,19 @@ async def on_message(message: discord.Message):
     if message.author.bot or message.guild is None:
         return
 
-    # --- BLOCK A: NEW MASTERS EVENT LISTENER (Server ID: 1258302667403563118) ---
+    # --- BLOCK A: NEW MASTERS EVENT LISTENER ---
     if message.guild.id == 1258302667403563118:
-        # Looking for the BCP link
         match = re.search(r"bestcoastpairings\.com/event/([a-zA-Z0-9]+)", message.content)
         if match:
             event_id = match.group(1)
             bcp_url = f"https://newprod-api.bestcoastpairings.com/v1/events/{event_id}"
             headers = {
                 "Accept": "application/json",
-                "x-api-key": "49cb621b-f75e-4ab3-b8ad-62cb89a85964", # Key from your script
+                "x-api-key": "49cb621b-f75e-4ab3-b8ad-62cb89a85964",
                 "client-id": "roster-stats"
             }
             
+            # Start TRY at the very beginning of the risky work
             try:
                 async with aiohttp.ClientSession() as session:
                     async with session.get(bcp_url, headers=headers, timeout=10) as resp:
@@ -2344,34 +2344,37 @@ async def on_message(message: discord.Message):
                             data = await resp.json()
                             city = data.get("city", "the area")
                             raw_date = data.get("eventDate", "")
-                            # Convert 2026-01-16T09:00:00 to Jan 16
+                            
                             clean_date = "that day"
                             if raw_date:
                                 dt_obj = datetime.fromisoformat(raw_date.replace('Z', ''))
                                 clean_date = dt_obj.strftime("%b %d")
 
-                            # OpenAI Call using your specific key
-                            from openai import OpenAI
-                            client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+                            # --- ASYNC OPENAI CALL ---
+                            from openai import AsyncOpenAI
+                            client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
                             
                             prompt = (
                                 f"You are a pompous, arrogant, full-of-themselves teenager. "
                                 f"You just saw someone post an event in {city} on {clean_date}. "
                                 f"Announce that YOU are thinking of running a much better event "
                                 f"on that same day in the same city. No links. Sound like a bratty teen TO. "
-                                f"Keep it short, e.g., 'I've been thinking of running an event on {clean_date} in {city}.'"
+                                f"Keep it short."
                             )
 
-                            response = client.chat.completions.create(
+                            # Notice the 'await' here
+                            response = await client.chat.completions.create(
                                 model="gpt-4o",
                                 messages=[{"role": "user", "content": prompt}]
                             )
                             announcement = response.choices[0].message.content
 
-                            # Channel ID: 1377378362842157238
-                            try:
-                                target_chan = await aos_bot.fetch_channel(1377378362842157238)
-                                await target_chan.send(announcement)
+                            # Post to Target Channel
+                            target_chan = await aos_bot.fetch_channel(1377378362842157238)
+                            await target_chan.send(announcement)
+                        else:
+                            logging.warning(f"BCP API returned status: {resp.status}")
+
             except discord.NotFound:
                 logging.warning("Target channel not found")
             except discord.Forbidden:
@@ -2380,14 +2383,13 @@ async def on_message(message: discord.Message):
                 logging.exception(f"BCP handler failed: {e}")
 
     # --- BLOCK B: EXISTING BARKER / SOCAL LOGIC ---
-    # Target Guild: 803881553108795413, Target User: 684591023678292010
     if message.guild.id == 803881553108795413 and message.author.id == 684591023678292010:
         content_low = message.content.lower()
         normalized = re.sub(r"\s+", "", content_low)
         if "bcp" in normalized or "best coast pairings" in content_low:
             await message.channel.send("BCP sucks")
 
-    # 3. CRITICAL: Process commands (!winrates, etc)
+    # 3. Process commands
     await aos_bot.process_commands(message)
 
 
