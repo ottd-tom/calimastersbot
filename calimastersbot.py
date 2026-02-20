@@ -1782,6 +1782,14 @@ vallis_responses = {
         "the unit will get strike-first for the first fight. "
         "For the second fight, strike-first is cancelled out by strike-last, so the unit will fight with normal timing."
     ),
+
+    "powerthrough": (
+        "Like all enemy abilities, Power Through can affect your opponent's manifestations and faction terrain, "
+        "but the ability requires both that the unit using the command has a greater health characteristic than "
+        "the target and that the target is in combat with your unit.  "
+        "In the End of Turn phase, manifestations and faction terrain with a move characteristic above 0 count for being in combat, "
+        "but those with a move of 0 don't.  So you can only use Power Through on mobile manifestations and faction terrain."
+    ),
 }
 
 @aos_bot.command(name="vallisbot", help="vallis knows all")
