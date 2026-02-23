@@ -2308,12 +2308,14 @@ async def thommoisinadequate_cmd(ctx, rounds: int = 5):
 
 
 # IDs for the target server and user
-TARGET_GUILD_ID = 803881553108795413  # socal discord
-TARGET_USER_ID = 684591023678292010  # Barker
-
+BARKER_USER_ID = 684591023678292010  # Barker
+THOMMO_USER_ID = 199725130337878017
 
 #TARGET_GUILD_ID = 940470229732032583  # test discord
 #TARGET_USER_ID = 199725130337878017  # me
+
+CORSAIR_SERVER_ID = 940470229732032583
+CORSAIR_CHANNEL_ID = 940470229732032586
 
 SOCAL_AOS_GUILD_ID = 803881553108795413
 EVENT_CHANNEL_ID = 1213278301154447420
@@ -2374,12 +2376,49 @@ async def on_message(message: discord.Message):
                 logging.exception(f"[BCP] Handler failed: {e}")
 
     # --- BLOCK B ---
-    if message.guild.id == 803881553108795413 and message.author.id == 684591023678292010:
+    if message.guild.id == SOCAL_AOS_GUILD_ID and message.author.id == BARKER_USER_ID:
         content_low = message.content.lower()
         normalized = re.sub(r"\s+", "", content_low)
         if "bcp" in normalized or "best coast pairings" in content_low:
             await message.channel.send("BCP sucks")
 
+    
+    # --- BLOCK C (Corsair Friday Thommo photos) ---
+    if message.guild.id == CORSAIR_SERVER_ID and message.channel.id == CORSAIR_CHANNEL_ID:
+        # Friday check: Monday=0 ... Sunday=6, so Friday==4
+        if datetime.now().weekday() == 6:
+
+    
+            # Robust mention check (works for both explicit mentions and <@id>/<@!id>)
+            tagged_thommo = (
+                any(u.id == THOMMO_USER_ID for u in message.mentions)
+                or f"<@{THOMMO_USER_ID}>" in message.content
+                or f"<@!{THOMMO_USER_ID}>" in message.content
+            )
+    
+            if tagged_thommo:
+                try:
+                    # Repo root-ish: directory containing this bot file
+                    repo_root = Path(__file__).resolve().parent
+                    photos_dir = repo_root / "DPHOTOS"
+    
+                    # Pick a random image file
+                    exts = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
+                    candidates = [
+                        p for p in photos_dir.iterdir()
+                        if p.is_file() and p.suffix.lower() in exts
+                    ]
+    
+                    if not candidates:
+                        logging.warning(f"[Corsair] No photos found in: {photos_dir}")
+                    else:
+                        chosen = random.choice(candidates)
+                        file = discord.File(str(chosen), filename=chosen.name)
+                        await message.channel.send(content="Happy Friday", file=file)
+    
+                except Exception as e:
+                    logging.exception(f"[Corsair] Friday photo handler failed: {e}")
+    
     await aos_bot.process_commands(message)
 
 
