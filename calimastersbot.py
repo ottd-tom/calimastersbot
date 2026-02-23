@@ -21,6 +21,8 @@ from google.generativeai.types import content_types
 from google.generativeai import types
 import openai
 import asyncpg
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 
 # Enable logging
@@ -1790,6 +1792,14 @@ vallis_responses = {
         "In the End of Turn phase, manifestations and faction terrain with a move characteristic above 0 count for being in combat, "
         "but those with a move of 0 don't.  So you can only use Power Through on mobile manifestations and faction terrain."
     ),
+
+    "strikelastpilein": (
+        "If a unit with strike-last piles-in to a unit without strike-last that wasn't in combat before, "
+        "the strike-last unit will finish its FIGHT ability, and then the other unit gets to fight.  "
+        "It fights before any other strike-last units can be picked to fight."
+        "Remember, 4th edition does not have sub-phases of the combat phase.  "
+        "Strike-first and strike-last just apply restrictions on when units can be picked to fight."
+    ),
 }
 
 @aos_bot.command(name="vallisbot", help="vallis knows all")
@@ -2386,7 +2396,8 @@ async def on_message(message: discord.Message):
     # --- BLOCK C (Corsair Friday Thommo photos) ---
     if message.guild.id == CORSAIR_SERVER_ID and message.channel.id == CORSAIR_CHANNEL_ID:
         # Friday check: Monday=0 ... Sunday=6, so Friday==4
-        if datetime.now().weekday() == 6:
+        pacific = ZoneInfo("America/Los_Angeles")
+        if datetime.now(pacific).weekday() == 6:
 
     
             # Robust mention check (works for both explicit mentions and <@id>/<@!id>)
