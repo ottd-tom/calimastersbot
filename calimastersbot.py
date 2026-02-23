@@ -1796,7 +1796,7 @@ vallis_responses = {
     "strikelastpilein": (
         "If a unit with strike-last piles-in to a unit without strike-last that wasn't in combat before, "
         "the strike-last unit will finish its FIGHT ability, and then the other unit gets to fight.  "
-        "It fights before any other strike-last units can be picked to fight."
+        "It fights before any other strike-last units can be picked to fight.\n"
         "Remember, 4th edition does not have sub-phases of the combat phase.  "
         "Strike-first and strike-last just apply restrictions on when units can be picked to fight."
     ),
