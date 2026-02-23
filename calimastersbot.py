@@ -2324,8 +2324,8 @@ THOMMO_USER_ID = 199725130337878017
 #TARGET_GUILD_ID = 940470229732032583  # test discord
 #TARGET_USER_ID = 199725130337878017  # me
 
-CORSAIR_SERVER_ID = 940470229732032583
-CORSAIR_CHANNEL_ID = 940470229732032586
+CORSAIR_SERVER_ID = 1071183737024434336
+CORSAIR_CHANNEL_ID = 1350184533349367882
 
 SOCAL_AOS_GUILD_ID = 803881553108795413
 EVENT_CHANNEL_ID = 1213278301154447420
@@ -2397,7 +2397,7 @@ async def on_message(message: discord.Message):
     if message.guild.id == CORSAIR_SERVER_ID and message.channel.id == CORSAIR_CHANNEL_ID:
         # Friday check: Monday=0 ... Sunday=6, so Friday==4
         pacific = ZoneInfo("America/Los_Angeles")
-        if datetime.now(pacific).weekday() == 6:
+        if datetime.now(pacific).weekday() == 4:
 
     
             # Robust mention check (works for both explicit mentions and <@id>/<@!id>)
