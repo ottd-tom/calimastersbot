@@ -1805,6 +1805,16 @@ vallis_responses = {
         "Remember, 4th edition does not have sub-phases of the combat phase.  "
         "Strike-first and strike-last just apply restrictions on when units can be picked to fight."
     ),
+
+    "glossary":(
+        "The AoS 4th edition rules include a glossary, and the game is quite a bit poorer for it. "
+        "Glossary entries aren't rules; they're just there to confuse and bewilder. "
+        "They are misleading or flat out wrong at least half the time.  "
+        "It should be called The Quick Reference Guide to Playing Age of Sigmar Wrong. \n\n"
+        "And if you search the official AoS app for a rule, be careful that it's not from the glossary, "
+        "unless you are interested in how the rule probably doesn't actually work. "
+        "Glossary entries come up more often than not, just to mess with players that don't read the actual rules."
+    ),
 }
 
 @aos_bot.command(name="vallisbot", help="vallis knows all")
