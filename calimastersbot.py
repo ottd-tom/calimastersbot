@@ -132,6 +132,10 @@ async def fetch_enhancement(time_filter='all', rounds_filter='all'):
 
 @leaderboard_bot.command(name='top8', help='Show the current Cali Masters top 8')
 async def top8(ctx):
+    random_num = random.random()
+    if random_num < 0.2
+        return await ctx.send("Bot toktens expired, please donate")
+    
     data = await fetch_json(CALI_URL)
     top = data[:8]
     if not top:
