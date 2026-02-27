@@ -2439,7 +2439,7 @@ async def on_message(message: discord.Message):
                         logging.warning(f"[Corsair] No photos found in: {photos_dir}")
                     else:
                         chosen = random.choice(candidates)
-                        file = discord.File(str(chosen), filename=chosen.name)
+                        file = discord.File(str(chosen), filename=chosen.name, spoiler=True)
                         await message.channel.send(content="Happy Friday", file=file)
     
                 except Exception as e:
