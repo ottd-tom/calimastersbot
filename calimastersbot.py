@@ -1848,7 +1848,8 @@ async def jobot_cmd(ctx):
 
 
 nic_phrases = [
-    "I would prefer a large dong"
+    "I would prefer a large dong",
+    "I think the penis with cum coming out was a tad excessive"
 ]
 @aos_bot.command(name='nicbot', help='Get your AoS Questions answered')
 async def nicbot_cmd(ctx):
