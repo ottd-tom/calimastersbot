@@ -134,7 +134,7 @@ async def fetch_enhancement(time_filter='all', rounds_filter='all'):
 async def top8(ctx):
     random_num = random.random()
     if random_num < 0.2:
-        return await ctx.send("Bot toktens expired, please donate")
+        return await ctx.send("Bot tokens expired, please donate")
     
     data = await fetch_json(CALI_URL)
     top = data[:8]
