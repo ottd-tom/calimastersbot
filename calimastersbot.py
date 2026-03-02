@@ -2029,55 +2029,7 @@ async def on_message(message: discord.Message):
     if message.author.bot or message.guild is None:
         return
 
-    # --- BLOCK A ---
-    if message.guild.id == SOCAL_AOS_GUILD_ID:
-        match = re.search(r"bestcoastpairings\.com/event/([a-zA-Z0-9]+)", message.content)
-        if match:
-            try:
-                event_id = match.group(1)
-                bcp_url = f"https://newprod-api.bestcoastpairings.com/v1/events/{event_id}"
-                headers = {
-                    "Accept": "application/json",
-                    "x-api-key": BCP_API_KEY,
-                    "client-id": "roster-stats",
-                    "User-Agent": USER_AGENT,
-                }
 
-                timeout = aiohttp.ClientTimeout(total=10)
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(bcp_url, headers=headers, timeout=timeout) as resp:
-                        if resp.status == 200:
-                            data = await resp.json()
-                            city = data.get("city", "the area")
-                            raw_date = data.get("eventDate", "")
-                            clean_date = "that day"
-                            if raw_date:
-                                dt_obj = datetime.fromisoformat(raw_date.replace('Z', ''))
-                                clean_date = dt_obj.strftime("%b %d")
-
-                            prompt = (
-                                f"You are a pompous, arrogant, full-of-themselves teenager who thinks they are the best TO in the world. "
-                                f"Announce that YOU are thinking of running an amazing event on {clean_date} in {city}. "
-                                f"Don't reference or acknowledge any other event. Just talk about your own amazing event. "
-                                f"Sound like a bratty teen TO. Keep it short. Do not use emoji."
-                            )
-                            response = openai.ChatCompletion.create(
-                                model="gpt-4o",
-                                messages=[{"role": "user", "content": prompt}]
-                            )
-                            announcement = "NoogTOBot: " + response["choices"][0]["message"]["content"]
-                            try:
-                                target_chan = await aos_bot.fetch_channel(EVENT_CHANNEL_ID)
-                                await target_chan.send(announcement)
-                            except discord.NotFound:
-                                logging.warning("[BCP] Target channel not found")
-                            except discord.Forbidden:
-                                logging.warning("[BCP] Bot lacks permission to post in target channel")
-
-            except Exception as e:
-                logging.exception(f"[BCP] Handler failed: {e}")
-
-    # --- BLOCK B ---
     if message.guild.id == SOCAL_AOS_GUILD_ID and message.author.id == BARKER_USER_ID:
         content_low = message.content.lower()
         normalized = re.sub(r"\s+", "", content_low)
@@ -2085,43 +2037,7 @@ async def on_message(message: discord.Message):
             await message.channel.send("BCP sucks")
 
     
-    # --- BLOCK C (Corsair Friday Thommo photos) ---
-    if message.guild.id == CORSAIR_SERVER_ID and message.channel.id == CORSAIR_CHANNEL_ID:
-        # Friday check: Monday=0 ... Sunday=6, so Friday==4
-        pacific = ZoneInfo("America/Los_Angeles")
-        if datetime.now(pacific).weekday() == 4:
-
-    
-            # Robust mention check (works for both explicit mentions and <@id>/<@!id>)
-            tagged_thommo = (
-                any(u.id == THOMMO_USER_ID for u in message.mentions)
-                or f"<@{THOMMO_USER_ID}>" in message.content
-                or f"<@!{THOMMO_USER_ID}>" in message.content
-            )
-    
-            if tagged_thommo:
-                try:
-                    # Repo root-ish: directory containing this bot file
-                    repo_root = Path(__file__).resolve().parent
-                    photos_dir = repo_root / "DPHOTOS"
-    
-                    # Pick a random image file
-                    exts = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
-                    candidates = [
-                        p for p in photos_dir.iterdir()
-                        if p.is_file() and p.suffix.lower() in exts
-                    ]
-    
-                    if not candidates:
-                        logging.warning(f"[Corsair] No photos found in: {photos_dir}")
-                    else:
-                        chosen = random.choice(candidates)
-                        file = discord.File(str(chosen), filename=chosen.name, spoiler=True)
-                        await message.channel.send(content="Happy Friday", file=file)
-    
-                except Exception as e:
-                    logging.exception(f"[Corsair] Friday photo handler failed: {e}")
-    
+ 
     await aos_bot.process_commands(message)
 
 
