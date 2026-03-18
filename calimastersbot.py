@@ -206,8 +206,7 @@ def _build_rolling_chart(faction: str, points: list[dict], window: int) -> Bytes
                 arrowprops=dict(arrowstyle='->', color='#aaaaaa', lw=0.8))
 
     # Title & labels
-    emoji = EMOJI_MAP.get(faction, '')
-    ax.set_title(f'{emoji} {faction}  —  {window}-day rolling win rate',
+    ax.set_title(f'{faction}  —  {window}-day rolling win rate',
                  color='#ffffff', fontsize=11, fontweight='bold', pad=10)
     ax.set_ylabel('Win Rate', color='#dcddde', fontsize=9)
 
