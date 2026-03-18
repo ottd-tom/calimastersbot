@@ -181,14 +181,8 @@ def _build_rolling_chart(faction: str, points: list[dict], window: int) -> Bytes
     # 50 % reference line
     ax.axhline(50, color='#ffffff', linewidth=0.8, linestyle='--', alpha=0.4, zorder=1)
  
-    # Main line + shaded area
+    # Main line
     ax.plot(dates, winrates, color=color, linewidth=2.2, zorder=3)
-    ax.fill_between(dates, 50, winrates,
-                    where=[w >= 50 for w in winrates],
-                    color=color, alpha=0.18, zorder=2)
-    ax.fill_between(dates, winrates, 50,
-                    where=[w < 50 for w in winrates],
-                    color='#dc3545', alpha=0.18, zorder=2)
  
     # Axes styling
     ax.set_ylim(30, 70)
@@ -230,6 +224,7 @@ def _build_rolling_chart(faction: str, points: list[dict], window: int) -> Bytes
     plt.close(fig)
     buf.seek(0)
     return buf
+ 
 
 
 @aos_bot.command(
