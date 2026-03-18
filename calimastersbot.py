@@ -157,23 +157,30 @@ def _build_rolling_chart(faction: str, points: list[dict], window: int) -> Bytes
     while hi > lo and pts[hi]['games'] <= MIN_GAMES:
         hi -= 1
     pts = pts[lo:hi + 1]
-
+ 
     if not pts:
         raise ValueError("No data remaining after trimming low-sample observations.")
-
+ 
     dates    = [datetime.strptime(p['date'], '%Y-%m-%d') for p in pts]
     winrates = [p['win_rate_pct'] for p in pts]
     games    = [p['games'] for p in pts]
-
+    lower    = [p['lower_95'] for p in pts]
+    upper    = [p['upper_95'] for p in pts]
+ 
     color = ALLIANCE_COLORS.get(FACTION_ALLIANCE.get(faction, ''), '#5865F2')
-
+ 
     fig, ax = plt.subplots(figsize=(9, 4), dpi=130)
     fig.patch.set_facecolor('#2b2d31')   # Discord dark background
     ax.set_facecolor('#2b2d31')
-
+ 
+    # 95% Wilson confidence band
+    has_bands = all(v is not None for v in lower + upper)
+    if has_bands:
+        ax.fill_between(dates, lower, upper, color=color, alpha=0.12, zorder=1, label='_nolegend_')
+ 
     # 50 % reference line
     ax.axhline(50, color='#ffffff', linewidth=0.8, linestyle='--', alpha=0.4, zorder=1)
-
+ 
     # Main line + shaded area
     ax.plot(dates, winrates, color=color, linewidth=2.2, zorder=3)
     ax.fill_between(dates, 50, winrates,
@@ -182,7 +189,7 @@ def _build_rolling_chart(faction: str, points: list[dict], window: int) -> Bytes
     ax.fill_between(dates, winrates, 50,
                     where=[w < 50 for w in winrates],
                     color='#dc3545', alpha=0.18, zorder=2)
-
+ 
     # Axes styling
     ax.set_ylim(30, 70)
     ax.set_xlim(dates[0], dates[-1])
@@ -195,7 +202,7 @@ def _build_rolling_chart(faction: str, points: list[dict], window: int) -> Bytes
         spine.set_edgecolor('#40444b')
     ax.tick_params(colors='#40444b', which='both')
     ax.grid(axis='y', color='#40444b', linewidth=0.5, alpha=0.6)
-
+ 
     # Latest win rate annotation
     latest_wr   = winrates[-1]
     latest_date = dates[-1]
@@ -204,20 +211,20 @@ def _build_rolling_chart(faction: str, points: list[dict], window: int) -> Bytes
                 xytext=(-42, 8), textcoords='offset points',
                 fontsize=9, color='#ffffff', fontweight='bold',
                 arrowprops=dict(arrowstyle='->', color='#aaaaaa', lw=0.8))
-
+ 
     # Title & labels
     ax.set_title(f'{faction}  —  {window}-day rolling win rate',
                  color='#ffffff', fontsize=11, fontweight='bold', pad=10)
     ax.set_ylabel('Win Rate', color='#dcddde', fontsize=9)
-
+ 
     # Footer note: date range + game count
     fig.text(0.99, 0.01,
              f"{dates[0].strftime('%d %b %Y')} – {latest_date.strftime('%d %b %Y')}  |  "
              f"latest window: {games[-1]} games  |  aos-events.com",
              ha='right', va='bottom', fontsize=7, color='#72767d')
-
+ 
     plt.tight_layout(pad=1.2)
-
+ 
     buf = BytesIO()
     fig.savefig(buf, format='png', facecolor=fig.get_facecolor())
     plt.close(fig)
