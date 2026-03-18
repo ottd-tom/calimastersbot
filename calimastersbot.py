@@ -1388,6 +1388,7 @@ async def help_cmd(ctx):
     lines = ["**AoS Events Bot Commands**",
              "!winrates [time_filter] - Full faction win rates",
              "!winrates <faction_alias> [time_filter]",
+             "!rollwr <faction_alias> [70]",
              "!popularity [time_filter] - Faction popularity",
              "!artefacts <faction_alias> [time_filter]",
              "!traits <faction_alias> [time_filter]",
