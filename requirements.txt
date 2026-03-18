@@ -6,3 +6,4 @@ scikit-learn
 google-generativeai
 Pillow
 asyncpg
+matplotlib
