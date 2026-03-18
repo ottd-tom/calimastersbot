@@ -16,6 +16,10 @@ import string
 from pathlib import Path
 from PIL import Image
 from io import BytesIO
+import matplotlib
+matplotlib.use('Agg')   # non-interactive backend — safe for async/server use
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 import openai
 import asyncpg
 from datetime import datetime
@@ -64,6 +68,7 @@ tex_bot         = commands.Bot(command_prefix='!', intents=intents, description=
 # Time filter display labels
 time_labels = {
     'all': 'Since 2025/01/01',
+    'current': 'Last 14 days',
     'recent': 'Last 60 days',
     'battlescroll': 'Since last battlescroll'
 }
@@ -122,6 +127,146 @@ async def fetch_enhancement(time_filter='all', rounds_filter='all'):
     base = API_URL.rstrip('/')
     url = f"{base}/api/enhancement_winrates?time={time_filter}&rounds={rounds_filter}"
     return await fetch_json(url)
+
+
+# Alliance colours — match the web UI
+ALLIANCE_COLORS = {
+    'Order':       '#0d6efd',
+    'Chaos':       '#dc3545',
+    'Death':       '#6f42c1',
+    'Destruction': '#198754',
+}
+FACTION_ALLIANCE = {f: a for a, facs in {
+    'Order':       ['Cities of Sigmar','Daughters of Khaine','Fyreslayers','Idoneth Deepkin',
+                    'Kharadron Overlords','Lumineth Realm-lords','Seraphon','Stormcast Eternals','Sylvaneth'],
+    'Chaos':       ['Blades of Khorne','Disciples of Tzeentch','Hedonites of Slaanesh',
+                    'Maggotkin of Nurgle','Skaven','Slaves to Darkness','Helsmiths of Hashut'],
+    'Death':       ['Flesh-eater Courts','Nighthaunt','Ossiarch Bonereapers','Soulblight Gravelords'],
+    'Destruction': ['Gloomspite Gitz','Ironjawz','Kruleboyz','Ogor Mawtribes','Sons of Behemat'],
+}.items() for f in facs}
+
+MIN_GAMES = 15   # trim observations with too few games (same logic as web UI)
+
+def _build_rolling_chart(faction: str, points: list[dict], window: int) -> BytesIO:
+    """Render a rolling win-rate line chart and return a PNG BytesIO."""
+    # Parse & trim
+    pts = sorted(points, key=lambda d: d['date'])
+    lo, hi = 0, len(pts) - 1
+    while lo < hi and pts[lo]['games'] <= MIN_GAMES:
+        lo += 1
+    while hi > lo and pts[hi]['games'] <= MIN_GAMES:
+        hi -= 1
+    pts = pts[lo:hi + 1]
+
+    if not pts:
+        raise ValueError("No data remaining after trimming low-sample observations.")
+
+    dates    = [datetime.strptime(p['date'], '%Y-%m-%d') for p in pts]
+    winrates = [p['win_rate_pct'] for p in pts]
+    games    = [p['games'] for p in pts]
+
+    color = ALLIANCE_COLORS.get(FACTION_ALLIANCE.get(faction, ''), '#5865F2')
+
+    fig, ax = plt.subplots(figsize=(9, 4), dpi=130)
+    fig.patch.set_facecolor('#2b2d31')   # Discord dark background
+    ax.set_facecolor('#2b2d31')
+
+    # 50 % reference line
+    ax.axhline(50, color='#ffffff', linewidth=0.8, linestyle='--', alpha=0.4, zorder=1)
+
+    # Main line + shaded area
+    ax.plot(dates, winrates, color=color, linewidth=2.2, zorder=3)
+    ax.fill_between(dates, 50, winrates,
+                    where=[w >= 50 for w in winrates],
+                    color=color, alpha=0.18, zorder=2)
+    ax.fill_between(dates, winrates, 50,
+                    where=[w < 50 for w in winrates],
+                    color='#dc3545', alpha=0.18, zorder=2)
+
+    # Axes styling
+    ax.set_ylim(30, 70)
+    ax.set_xlim(dates[0], dates[-1])
+    ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda v, _: f'{v:.0f}%'))
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%b '%y"))
+    ax.xaxis.set_major_locator(mdates.MonthLocator(interval=2))
+    plt.setp(ax.get_xticklabels(), rotation=30, ha='right', fontsize=8, color='#dcddde')
+    plt.setp(ax.get_yticklabels(), fontsize=8, color='#dcddde')
+    for spine in ax.spines.values():
+        spine.set_edgecolor('#40444b')
+    ax.tick_params(colors='#40444b', which='both')
+    ax.grid(axis='y', color='#40444b', linewidth=0.5, alpha=0.6)
+
+    # Latest win rate annotation
+    latest_wr   = winrates[-1]
+    latest_date = dates[-1]
+    ax.annotate(f'{latest_wr:.1f}%',
+                xy=(latest_date, latest_wr),
+                xytext=(-42, 8), textcoords='offset points',
+                fontsize=9, color='#ffffff', fontweight='bold',
+                arrowprops=dict(arrowstyle='->', color='#aaaaaa', lw=0.8))
+
+    # Title & labels
+    emoji = EMOJI_MAP.get(faction, '')
+    ax.set_title(f'{emoji} {faction}  —  {window}-day rolling win rate',
+                 color='#ffffff', fontsize=11, fontweight='bold', pad=10)
+    ax.set_ylabel('Win Rate', color='#dcddde', fontsize=9)
+
+    # Footer note: date range + game count
+    fig.text(0.99, 0.01,
+             f"{dates[0].strftime('%d %b %Y')} – {latest_date.strftime('%d %b %Y')}  |  "
+             f"latest window: {games[-1]} games  |  aos-events.com",
+             ha='right', va='bottom', fontsize=7, color='#72767d')
+
+    plt.tight_layout(pad=1.2)
+
+    buf = BytesIO()
+    fig.savefig(buf, format='png', facecolor=fig.get_facecolor())
+    plt.close(fig)
+    buf.seek(0)
+    return buf
+
+
+@aos_bot.command(
+    name='rollwr',
+    help='Post a rolling win-rate chart for a faction. Usage: !rollwr <faction_alias> [28|70]'
+)
+async def rollwr_cmd(ctx, alias: str, window_arg: str = '28'):
+    # Validate window
+    if window_arg not in ('28', '70'):
+        return await ctx.send(':warning: Window must be `28` or `70`.')
+    window = int(window_arg)
+
+    # Resolve faction alias
+    canonical = ALIAS_MAP.get(alias.lower())
+    if not canonical:
+        return await ctx.send(f":warning: Unknown faction `{alias}`. Try an alias like `fec`, `sce`, `dok`…")
+
+    await ctx.typing()
+
+    # Fetch data from the API
+    url = f"{API_URL.rstrip('/')}/api/rolling_winrates/faction/{quote(canonical)}?window={window}"
+    try:
+        data = await fetch_json(url)
+    except Exception as e:
+        return await ctx.send(f':x: API error: {e}')
+
+    series_key = f'{window}_all'
+    points = (data.get('series') or {}).get(series_key, [])
+    if not points:
+        return await ctx.send(f':warning: No rolling win-rate data found for **{canonical}** ({window}-day).')
+
+    # Build chart in a thread (matplotlib is CPU-bound)
+    loop = asyncio.get_event_loop()
+    try:
+        buf = await loop.run_in_executor(None, _build_rolling_chart, canonical, points, window)
+    except ValueError as e:
+        return await ctx.send(f':warning: {e}')
+    except Exception as e:
+        logging.exception('rollwr chart build failed')
+        return await ctx.send(f':x: Chart error: {e}')
+
+    filename = f"rollwr_{canonical.replace(' ', '_')}_{window}d.png"
+    await ctx.send(file=discord.File(buf, filename=filename))
 
 # ========== Leaderboard Bot Commands ==========
 
@@ -219,7 +364,7 @@ async def rank(ctx, *, query: str):
 
 # ========== AoS Win Rates Bot Commands ==========
 
-TIME_FILTERS     = ['all', 'recent', 'battlescroll']
+TIME_FILTERS     = ['all', 'current', 'recent', 'battlescroll']
 EXCLUDE_FACTIONS = ['Beasts of Chaos', 'Bonesplitterz']
 ALIAS_MAP        = {
     'fec': 'Flesh-eater Courts', 'flesh-eater courts': 'Flesh-eater Courts',
