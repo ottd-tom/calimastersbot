@@ -1556,6 +1556,16 @@ async def adambot_cmd(ctx):
     phrase = random.choice(adam_phrases)
     await ctx.send(phrase)
 
+aj_phrases = [
+    "A magical chaos entitiy spewing vomit 49 feet seems realistic"
+]
+@aos_bot.command(name='ajbot', help='Get your AoS Questions answered')
+async def ajbot_cmd(ctx):
+    phrase = random.choice(aj_phrases)
+    await ctx.send(phrase)
+
+
+
 e_phrases = [
     "Ligmar has low intelligence, high loyalty."
 ]
