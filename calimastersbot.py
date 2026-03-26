@@ -60,6 +60,26 @@ intents = discord.Intents.default()
 intents.message_content = True
 intents.guilds = True
 
+# IDs for the target server and user
+BARKER_USER_ID = 684591023678292010  # Barker
+THOMMO_USER_ID = 199725130337878017
+
+#TARGET_GUILD_ID = 940470229732032583  # test discord
+#TARGET_USER_ID = 199725130337878017  # me
+
+CORSAIR_SERVER_ID = 1071183737024434336
+CORSAIR_CHANNEL_ID = 1350184533349367882
+
+SOCAL_AOS_GUILD_ID = 803881553108795413
+EVENT_CHANNEL_ID = 1213278301154447420
+
+AOS_COACH_SERVER_ID = 615105941079326721
+TOURN_RESULTS_CHANNEL_ID = 769134467805216829
+BOT_ACTIONS_CHANNEL_ID = 706084206631190528
+
+USER_AGENT = "AoS-California-Masters"
+
+
 # Create Bot instances
 leaderboard_bot = commands.Bot(command_prefix='!', intents=intents, description="Cali Masters Leaderboard Bot")
 aos_bot         = commands.Bot(command_prefix='!', intents=intents, description="AoS Win Rates Bot")
@@ -253,6 +273,10 @@ def _build_rolling_chart(faction: str, points: list[dict], window: int, release_
     help='Post a rolling win-rate chart for a faction. Usage: !rollwr <faction_alias> [28|70]'
 )
 async def rollwr_cmd(ctx, alias: str, window_arg: str = '28'):
+    if message.guild.id == AOS_COACH_SERVER_ID and message.channel.id == 769134467805216829:
+        return await ctx.send(f"Please use <#{BOT_ACTIONS_CHANNEL_ID}> for bot commands!")
+    
+    
     # Validate window
     if window_arg not in ('28', '70'):
         return await ctx.send(':warning: Window must be `28` or `70`.')
@@ -2193,21 +2217,6 @@ async def thommoisinadequate_cmd(ctx, rounds: int = 5):
     await ctx.send(text)
 
 
-
-# IDs for the target server and user
-BARKER_USER_ID = 684591023678292010  # Barker
-THOMMO_USER_ID = 199725130337878017
-
-#TARGET_GUILD_ID = 940470229732032583  # test discord
-#TARGET_USER_ID = 199725130337878017  # me
-
-CORSAIR_SERVER_ID = 1071183737024434336
-CORSAIR_CHANNEL_ID = 1350184533349367882
-
-SOCAL_AOS_GUILD_ID = 803881553108795413
-EVENT_CHANNEL_ID = 1213278301154447420
-
-USER_AGENT = "AoS-California-Masters"
 
 @aos_bot.event
 async def on_message(message: discord.Message):
