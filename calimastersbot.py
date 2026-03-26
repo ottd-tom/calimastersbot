@@ -273,7 +273,7 @@ def _build_rolling_chart(faction: str, points: list[dict], window: int, release_
     help='Post a rolling win-rate chart for a faction. Usage: !rollwr <faction_alias> [28|70]'
 )
 async def rollwr_cmd(ctx, alias: str, window_arg: str = '28'):
-    if message.guild.id == AOS_COACH_SERVER_ID and message.channel.id == 769134467805216829:
+    if ctx.guild.id == AOS_COACH_SERVER_ID and ctx.channel.id == 769134467805216829:
         return await ctx.send(f"Please use <#{BOT_ACTIONS_CHANNEL_ID}> for bot commands!")
     
     
@@ -1468,7 +1468,18 @@ async def servers(ctx):
     lines = [f"Servers I'm in ({len(guilds)}):"]
     for idx, g in enumerate(guilds, start=1):
         lines.append(f"{idx}. {g.name} (ID: {g.id})")
-    await ctx.send("```" + "\n".join(lines) + "```")
+    
+    chunk, chunks = [], []
+    for line in lines:
+        if sum(len(l) + 1 for l in chunk) + len(line) > 1900:
+            chunks.append(chunk)
+            chunk = []
+        chunk.append(line)
+    if chunk:
+        chunks.append(chunk)
+    
+    for c in chunks:
+        await ctx.send("```" + "\n".join(c) + "```")
 
 
 import random
