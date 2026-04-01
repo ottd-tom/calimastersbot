@@ -1735,7 +1735,8 @@ async def vallisbot_cmd(ctx, key: str = None):
 
 jo_phrases = [
     "(Not knowing context since I'm at work, so quick response) I love a good pp",
-    "The best thing here. Turns out anal is a cure all"
+    "The best thing here. Turns out anal is a cure all",
+    "I ain't got the time for pp unfortunately."
 ]
 @aos_bot.command(name='jobot', help='Get your AoS Questions answered')
 async def jobot_cmd(ctx):
