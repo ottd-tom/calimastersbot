@@ -1571,6 +1571,7 @@ tombot_phrase_weights = [
     ("I love junk",                          3),
     ("they call me the compliment machine",  1),
     ("A gentleman never rolls his opponents dice", 1),
+    ("give them the business", 1),
     ("Man I love nuts",1),
     (SUN_TZU_AOS_STRAT, 0.000001)
 ]
