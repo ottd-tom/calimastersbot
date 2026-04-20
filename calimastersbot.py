@@ -1355,14 +1355,14 @@ async def playerwr_cmd(ctx, first_name: str, last_name: str):
     total_losses = 0
 
     # Ensure we process 2025 first to get the userId, then sort other years descending
-    years_to_process = [2025] + sorted([year for year in LEAGUE_YEARS if year != 2025], reverse=True)
+    years_to_process = [2026] + sorted([year for year in LEAGUE_YEARS if year != 2026], reverse=True)
 
     async with aiohttp.ClientSession() as session: # Use a single session for all requests
         for year in years_to_process:
             league_id = LEAGUE_YEARS[year]
             
-            if year == 2025:
-                # For 2025, search by name and retrieve the userId
+            if year == 2026:
+                # For 2026, search by name and retrieve the userId
                 stats_with_id = await fetch_player_placings_for_year(
                     session, player_to_find, league_id, year
                 )
@@ -1382,8 +1382,8 @@ async def playerwr_cmd(ctx, first_name: str, last_name: str):
                 else:
                     all_player_stats[year] = {"wins": "N/A", "ties": "N/A", "losses": "N/A"}
             else:
-                # If player wasn't found in 2025, mark subsequent years as N/A
-                logging.info(f"Skipping {year} as player '{full_player_name}' (or their ID) was not found in 2025.")
+                # If player wasn't found in 2026, mark subsequent years as N/A
+                logging.info(f"Skipping {year} as player '{full_player_name}' (or their ID) was not found in 2026.")
                 all_player_stats[year] = {"wins": "N/A", "ties": "N/A", "losses": "N/A"}
 
     # Calculate and add win rates and overall totals
