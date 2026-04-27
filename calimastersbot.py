@@ -140,12 +140,12 @@ async def fetch_json(url):
 
 async def fetch_winrates(time_filter='all'):
     base = API_URL.rstrip('/')
-    url = f"{base if base.lower().endswith('winrates') else base + '/api/winrates'}?time={time_filter}"
+    url = f"{base if base.lower().endswith('winrates') else base + '/api/aos/winrates'}?time={time_filter}"
     return await fetch_json(url)
 
 async def fetch_enhancement(time_filter='all', rounds_filter='all'):
     base = API_URL.rstrip('/')
-    url = f"{base}/api/enhancement_winrates?time={time_filter}&rounds={rounds_filter}"
+    url = f"{base}/api/aos/enhancement_winrates?time={time_filter}&rounds={rounds_filter}"
     return await fetch_json(url)
 
 
@@ -290,7 +290,7 @@ async def rollwr_cmd(ctx, alias: str, window_arg: str = '28'):
     await ctx.typing()
 
     # Fetch data from the API
-    url = f"{API_URL.rstrip('/')}/api/rolling_winrates/faction/{quote(canonical)}?window={window}"
+    url = f"{API_URL.rstrip('/')}/api/aos/rolling_winrates/faction/{quote(canonical)}?window={window}"
     try:
         data = await fetch_json(url)
     except Exception as e:
@@ -303,7 +303,7 @@ async def rollwr_cmd(ctx, alias: str, window_arg: str = '28'):
 
     # Fetch release events (battlescrolls + book dates) for annotations
     try:
-        release_events = await fetch_json(f"{API_URL.rstrip('/')}/api/release_events")
+        release_events = await fetch_json(f"{API_URL.rstrip('/')}/api/aos/release_events")
     except Exception:
         release_events = None
 
@@ -541,7 +541,7 @@ async def hof(ctx, *, alias: str):
     canonical = ALIAS_MAP.get(lookup)
     if not canonical:
         return await ctx.send(f"Unknown faction '{alias}'. Available aliases: {', '.join(ALIAS_MAP.keys())}")
-    url = f"{API_URL.rstrip('/')}/api/five_win_players"
+    url = f"{API_URL.rstrip('/')}/api/aos/five_win_players"
     data = await fetch_json(url)
     entries = [e for e in data if e.get('faction') == canonical]
     if not entries:
@@ -561,7 +561,7 @@ async def units_cmd(ctx, alias: str, time_filter: str = 'all'):
     tf = time_filter.lower()
     if tf not in TIME_FILTERS:
         return await ctx.send(f"Invalid time filter '{time_filter}'.")
-    data = await fetch_json(f"{API_URL.rstrip('/')}/api/winrates?time={tf}")
+    data = await fetch_json(f"{API_URL.rstrip('/')}/api/aos/winrates?time={tf}")
     units = [u for u in data.get('units', []) if u.get('faction') == canonical]
     if not units:
         return await ctx.send(f"No unit data for {canonical} ({tf}).")
@@ -590,7 +590,7 @@ async def popularity_cmd(ctx, arg: str = 'factions', maybe_time: str = 'all'):
         return await ctx.send(
             f"Invalid category or time filter '{arg}'."
         )
-    data = await fetch_json(f"{API_URL.rstrip('/')}/api/popularity?time={tf}")
+    data = await fetch_json(f"{API_URL.rstrip('/')}/api/aos/popularity?time={tf}")
     items = data.get(category, [])
     if not items:
         return await ctx.send(f"No popularity data for {category} ({tf}).")
