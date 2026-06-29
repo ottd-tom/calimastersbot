@@ -24,7 +24,7 @@ import openai
 import asyncpg
 from datetime import datetime
 from zoneinfo import ZoneInfo
-
+from aos_sentiment import register as register_sentiment
 
 # Enable logging
 logging.basicConfig(level=logging.INFO)
@@ -2352,6 +2352,7 @@ async def main():
         asyncio.create_task(run_bot(aos_bot,         token_aos,         "aos_bot",         initial_delay=12)),
         asyncio.create_task(run_bot(tex_bot,         token_texas,       "tex_bot",         initial_delay=24)),
     ]
+    register_sentiment(aos_bot, get_db_pool, ALIAS_MAP, EMOJI_MAP)
     await asyncio.gather(*tasks, return_exceptions=True)
 
 
