@@ -52,7 +52,7 @@ log = logging.getLogger(__name__)
 # ----------------------------------------------------------------------------
 # Config
 # ----------------------------------------------------------------------------
-SENTIMENT_GUILD_ID = 1258302667403563118  # <-- set this
+SENTIMENT_GUILD_ID = 940470229732032583  # <-- set this
 SENTIMENT_CATEGORY_NAME = os.getenv("SENTIMENT_CATEGORY_NAME")  # None = all text channels
 
 DEFAULT_LOOKBACK_HOURS = 48
