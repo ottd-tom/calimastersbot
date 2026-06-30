@@ -1604,7 +1604,8 @@ async def ajbot_cmd(ctx):
 
 
 e_phrases = [
-    "Ligmar has low intelligence, high loyalty."
+    "Ligmar has low intelligence, high loyalty.",
+    "Welcome back Jews"
 ]
 @aos_bot.command(name='ebot', help='Get your AoS Questions answered')
 async def ebot_cmd(ctx):
@@ -1753,14 +1754,6 @@ nic_phrases = [
 @aos_bot.command(name='nicbot', help='Get your AoS Questions answered')
 async def nicbot_cmd(ctx):
     phrase = random.choice(nic_phrases)
-    await ctx.send(phrase)
-
-e_phrases = [
-    "Welcome back jews"
-]
-@aos_bot.command(name='ebot', help='Get your AoS Questions answered')
-async def ebot_cmd(ctx):
-    phrase = random.choice(e_phrases)
     await ctx.send(phrase)
 
 tomtom_phrases = [
