@@ -1755,6 +1755,13 @@ async def nicbot_cmd(ctx):
     phrase = random.choice(nic_phrases)
     await ctx.send(phrase)
 
+e_phrases = [
+    "Welcome back jews"
+]
+@aos_bot.command(name='ebot', help='Get your AoS Questions answered')
+async def ebot_cmd(ctx):
+    phrase = random.choice(e_phrases)
+    await ctx.send(phrase)
 
 tomtom_phrases = [
     "Tom's so smart"
