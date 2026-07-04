@@ -4,9 +4,9 @@ aos_sentiment.py
 
 Faction sentiment-index command for the AoS bot.
 
-Collects recent messages from each faction channel, scores fan sentiment with
-OpenAI, and writes the results to Postgres (AOS_EVENTS_DB_URL). Designed to drop
-into calimastersbot.py without touching the rest of the file.
+Collects messages from each faction channel over a time range, scores fan
+sentiment with OpenAI, and writes the results to Postgres (AOS_EVENTS_DB_URL).
+Designed to drop into calimastersbot.py without touching the rest of the file.
 
 Wiring it in (two lines in calimastersbot.py)
 ---------------------------------------------
@@ -24,6 +24,8 @@ Config you must set
 -------------------
 SENTIMENT_GUILD_ID below: the server whose channels hold one-per-faction chat.
 Optionally SENTIMENT_CATEGORY_NAME to restrict to a single category.
+SENTIMENT_TZ: timezone for interpreting/displaying dates you type (default UTC).
+    e.g. SENTIMENT_TZ="America/Los_Angeles"
 
 Channels are matched to factions by name via your ALIAS_MAP (e.g. a channel
 called "daughters-of-khaine", "dok", or "#dok-chat" all resolve correctly). For
@@ -31,10 +33,18 @@ any oddly-named channels, add them to FACTION_CHANNEL_OVERRIDES.
 
 Usage in Discord
 ----------------
-    !sentiment            -> every faction channel it can find
-    !sentiment dok        -> just Daughters of Khaine (any alias works)
-    !sentiment 24         -> all factions, last 24h instead of 48
-    !sentiment dok 72     -> Daughters of Khaine, last 72h
+    !sentiment                          all factions, last 48h (default window)
+    !sentiment 24                       all factions, last 24h
+    !sentiment dok                      one faction, last 48h
+    !sentiment dok 72                   one faction, last 72h
+    !sentiment from:2026-06-25 to:2026-06-28
+                                        all factions, explicit date range
+    !sentiment dok from:2026-06-25T18:00 to:2026-06-26T06:00
+                                        one faction, explicit datetime range
+    !sentiment from:2026-06-25          start date given, end defaults to now
+
+Dates accept YYYY-MM-DD or YYYY-MM-DDTHH:MM (no spaces). Naive times are read in
+SENTIMENT_TZ. Aliases for the keywords: from/start/since and to/end/until.
 """
 
 import os
@@ -43,6 +53,7 @@ import json
 import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 import discord
 import openai  # legacy SDK, same as the rest of the bot
@@ -54,10 +65,12 @@ log = logging.getLogger(__name__)
 # ----------------------------------------------------------------------------
 SENTIMENT_GUILD_ID = 615105941079326721  # <-- set this
 SENTIMENT_CATEGORY_NAME = os.getenv("SENTIMENT_CATEGORY_NAME")  # None = all text channels
+SENTIMENT_TZ_NAME = os.getenv("SENTIMENT_TZ", "UTC")            # how to read typed dates
+SENTIMENT_TZ = ZoneInfo(SENTIMENT_TZ_NAME)
 
 DEFAULT_LOOKBACK_HOURS = 48
 BATCH_SIZE = 40                    # messages per OpenAI call
-MAX_MESSAGES_PER_CHANNEL = 600     # cost guardrail per channel
+MAX_MESSAGES_PER_CHANNEL = 600     # cost guardrail per channel (oldest-first within range)
 MAX_MSG_CHARS = 500                # truncate any one message (e.g. pasted army lists)
 CHANNEL_CONCURRENCY = 4            # channels processed in parallel
 MODEL = "gpt-4o-mini"
@@ -67,6 +80,9 @@ FACTION_CHANNEL_OVERRIDES: dict = {
     # 123456789012345678: "Stormcast Eternals",
     # "general-chaos-chat": "Slaves to Darkness",
 }
+
+FROM_KEYS = {"from", "start", "since"}
+TO_KEYS = {"to", "end", "until"}
 
 CLASSIFY_SYSTEM = (
     "You analyse fan reactions in a Warhammer: Age of Sigmar community. Classify "
@@ -79,6 +95,54 @@ CLASSIFY_SYSTEM = (
     'Respond with ONLY a JSON object: '
     '{"positive": int, "neutral": int, "negative": int, "themes": [str, ...]}'
 )
+
+
+# ----------------------------------------------------------------------------
+# Date parsing
+# ----------------------------------------------------------------------------
+def _parse_dt(text: str) -> datetime:
+    """Parse a user-supplied date/datetime into an aware UTC datetime.
+
+    Accepts YYYY-MM-DD, YYYY-MM-DDTHH:MM[:SS], optional trailing Z. Naive values
+    are interpreted in SENTIMENT_TZ.
+    """
+    s = text.strip().replace("/", "-")
+    if s.endswith("Z"):
+        s = s[:-1] + "+00:00"
+    dt = None
+    try:
+        dt = datetime.fromisoformat(s)
+    except ValueError:
+        for fmt in ("%Y-%m-%d", "%Y-%m-%dT%H:%M", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M"):
+            try:
+                dt = datetime.strptime(s, fmt)
+                break
+            except ValueError:
+                continue
+    if dt is None:
+        raise ValueError(
+            f"Couldn't parse '{text}'. Use e.g. 2026-06-25 or 2026-06-25T14:30."
+        )
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=SENTIMENT_TZ)
+    return dt.astimezone(timezone.utc)
+
+
+def _split_kw(token: str):
+    """If token is `keyword:value` or `keyword=value` for a known keyword,
+    return (keyword, value); else (None, None). Splits only on the keyword
+    prefix so colons inside the value (e.g. a time) are preserved."""
+    low = token.lower()
+    for kw in FROM_KEYS | TO_KEYS:
+        for sep in (":", "="):
+            prefix = kw + sep
+            if low.startswith(prefix):
+                return kw, token[len(prefix):]
+    return None, None
+
+
+def _fmt_local(dt: datetime) -> str:
+    return dt.astimezone(SENTIMENT_TZ).strftime("%Y-%m-%d %H:%M")
 
 
 # ----------------------------------------------------------------------------
@@ -158,17 +222,16 @@ def _resolve_faction_channels(guild: discord.Guild, alias_map: dict) -> dict:
     norm_index = {_normalize(k): v for k, v in alias_map.items()}
     out: dict = {}
     for ch in channels:
-        # explicit overrides win
         canon = FACTION_CHANNEL_OVERRIDES.get(ch.id) or FACTION_CHANNEL_OVERRIDES.get(ch.name)
         if not canon:
             norm = _normalize(ch.name)
             canon = norm_index.get(norm)
-            if not canon:  # fall back to any token matching an alias
+            if not canon:
                 for tok in norm.split():
                     if tok in norm_index:
                         canon = norm_index[tok]
                         break
-        if canon and canon not in out:  # first channel wins if duplicates
+        if canon and canon not in out:
             out[canon] = ch
     return out
 
@@ -193,30 +256,37 @@ async def _ensure_table(pool):
                 summary       TEXT
             );
         """)
+        # migrate existing tables to carry the explicit window bounds
+        await conn.execute(
+            "ALTER TABLE faction_sentiment ADD COLUMN IF NOT EXISTS window_start TIMESTAMPTZ;")
+        await conn.execute(
+            "ALTER TABLE faction_sentiment ADD COLUMN IF NOT EXISTS window_end   TIMESTAMPTZ;")
         await conn.execute("""
             CREATE INDEX IF NOT EXISTS idx_faction_sentiment_faction_time
                 ON faction_sentiment (faction, collected_at DESC);
         """)
 
 
-async def _store_result(pool, r: dict, hours: int):
+async def _store_result(pool, r: dict, start: datetime, end: datetime):
+    window_hours = max(1, int(round((end - start).total_seconds() / 3600)))
     async with pool.acquire() as conn:
         await conn.execute("""
             INSERT INTO faction_sentiment
                 (faction, window_hours, message_count, positive, neutral,
-                 negative, score, themes, summary)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9)
-        """, r["faction"], hours, r["volume"], r["positive"], r["neutral"],
-             r["negative"], r["score"], json.dumps(r["themes"]), r["summary"])
+                 negative, score, themes, summary, window_start, window_end)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11)
+        """, r["faction"], window_hours, r["volume"], r["positive"], r["neutral"],
+             r["negative"], r["score"], json.dumps(r["themes"]), r["summary"],
+             start, end)
 
 
 # ----------------------------------------------------------------------------
 # Core analysis for one channel
 # ----------------------------------------------------------------------------
-async def _analyze_channel(faction: str, channel: discord.TextChannel, hours: int):
-    after = datetime.now(timezone.utc) - timedelta(hours=hours)
+async def _analyze_channel(faction: str, channel: discord.TextChannel,
+                           start: datetime, end: datetime):
     contents: list[str] = []
-    async for msg in channel.history(after=after, limit=None, oldest_first=True):
+    async for msg in channel.history(after=start, before=end, limit=None, oldest_first=True):
         if msg.author.bot:
             continue
         text = (msg.content or "").strip()
@@ -239,7 +309,6 @@ async def _analyze_channel(faction: str, channel: discord.TextChannel, hours: in
 
     total = pos + neu + neg or 1
     score = (pos - neg) / total
-    # dedupe themes, keep order, cap at 5
     top_themes = list(dict.fromkeys(themes))[:5]
     summary = await _summarise(faction, top_themes, score)
 
@@ -276,18 +345,42 @@ def register(bot, get_db_pool, alias_map: dict, emoji_map: dict):
 
     @bot.command(
         name="sentiment",
-        help="Score faction fan sentiment and save to DB. "
-             "Usage: !sentiment [faction_alias] [hours]",
+        help="Score faction fan sentiment over a time range and save to DB. "
+             "Usage: !sentiment [faction] [hours] | "
+             "!sentiment [faction] from:YYYY-MM-DD to:YYYY-MM-DD",
     )
     async def sentiment(ctx, *args):
-        # parse optional faction + optional hours, in any order
-        hours = DEFAULT_LOOKBACK_HOURS
+        hours = None
+        start_arg = end_arg = None
         faction_arg = None
         for a in args:
-            if a.isdigit():
-                hours = max(1, min(int(a), 168))  # clamp 1h..7d
+            kw, val = _split_kw(a)
+            if kw in FROM_KEYS and val:
+                start_arg = val
+            elif kw in TO_KEYS and val:
+                end_arg = val
+            elif a.isdigit():
+                hours = max(1, int(a))
             else:
                 faction_arg = a
+
+        # resolve the collection window
+        now = datetime.now(timezone.utc)
+        try:
+            if start_arg or end_arg:
+                end_dt = _parse_dt(end_arg) if end_arg else now
+                start_dt = (_parse_dt(start_arg) if start_arg
+                            else end_dt - timedelta(hours=DEFAULT_LOOKBACK_HOURS))
+            else:
+                h = hours if hours is not None else DEFAULT_LOOKBACK_HOURS
+                end_dt, start_dt = now, now - timedelta(hours=h)
+        except ValueError as e:
+            return await ctx.send(f":warning: {e}")
+
+        if start_dt >= end_dt:
+            return await ctx.send(":warning: Start must be before end.")
+
+        span_label = f"{_fmt_local(start_dt)} -> {_fmt_local(end_dt)} {SENTIMENT_TZ_NAME}"
 
         guild = bot.get_guild(SENTIMENT_GUILD_ID) if SENTIMENT_GUILD_ID else ctx.guild
         if guild is None:
@@ -300,7 +393,6 @@ def register(bot, get_db_pool, alias_map: dict, emoji_map: dict):
                                   "Check SENTIMENT_GUILD_ID / category, or add "
                                   "FACTION_CHANNEL_OVERRIDES.")
 
-        # narrow to a single faction if asked
         if faction_arg:
             canon = alias_map.get(faction_arg.lower())
             if not canon:
@@ -314,7 +406,7 @@ def register(bot, get_db_pool, alias_map: dict, emoji_map: dict):
 
         status = await ctx.send(
             f":hourglass: Analysing **{len(targets)}** faction"
-            f"{'s' if len(targets) != 1 else ''} over the last {hours}h…"
+            f"{'s' if len(targets) != 1 else ''} for {span_label}…"
         )
 
         try:
@@ -330,10 +422,10 @@ def register(bot, get_db_pool, alias_map: dict, emoji_map: dict):
         async def worker(fac, chan):
             async with sem:
                 try:
-                    r = await _analyze_channel(fac, chan, hours)
+                    r = await _analyze_channel(fac, chan, start_dt, end_dt)
                     if not r:
                         return
-                    await _store_result(pool, r, hours)
+                    await _store_result(pool, r, start_dt, end_dt)
                     results.append(r)
                 except discord.Forbidden:
                     failures.append(f"{fac} (no read access)")
@@ -345,8 +437,8 @@ def register(bot, get_db_pool, alias_map: dict, emoji_map: dict):
 
         if not results:
             note = f"\nFailed: {', '.join(failures)}" if failures else ""
-            return await status.edit(content=f":warning: No messages found to "
-                                             f"analyse in the last {hours}h.{note}")
+            return await status.edit(
+                content=f":warning: No messages found in {span_label}.{note}")
 
         results.sort(key=lambda r: r["score"], reverse=True)
         lines = []
@@ -358,7 +450,7 @@ def register(bot, get_db_pool, alias_map: dict, emoji_map: dict):
             )
 
         embed = discord.Embed(
-            title=f"Faction sentiment — last {hours}h",
+            title=f"Faction sentiment — {span_label}",
             description="\n".join(lines)[:4096],
             color=0x5865F2,
         )
@@ -370,7 +462,6 @@ def register(bot, get_db_pool, alias_map: dict, emoji_map: dict):
         await status.edit(content=":white_check_mark: Done — saved to the database.")
         await ctx.send(embed=embed)
 
-        # for a single faction, also show the written-up summary
         if faction_arg and results and results[0]["summary"]:
             await ctx.send(f"**{results[0]['faction']}** — {results[0]['summary']}")
 
