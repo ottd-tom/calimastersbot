@@ -36,7 +36,8 @@ Usage in Discord
     !sentiment                          all factions, last 48h (default window)
     !sentiment 24                       all factions, last 24h
     !sentiment dok                      one faction, last 48h
-    !sentiment dok 72                   one faction, last 72h
+    !sentiment dok bok 72               two factions, last 72h
+    !sentiment dok bok skaven           several factions, last 48h
     !sentiment from:2026-06-25 to:2026-06-28
                                         all factions, explicit date range
     !sentiment dok from:2026-06-25T18:00 to:2026-06-26T06:00
@@ -63,14 +64,14 @@ log = logging.getLogger(__name__)
 # ----------------------------------------------------------------------------
 # Config
 # ----------------------------------------------------------------------------
-SENTIMENT_GUILD_ID = 615105941079326721  # <-- set this
+SENTIMENT_GUILD_ID = 615105941079326721
 SENTIMENT_CATEGORY_NAME = os.getenv("SENTIMENT_CATEGORY_NAME")  # None = all text channels
 SENTIMENT_TZ_NAME = os.getenv("SENTIMENT_TZ", "UTC")            # how to read typed dates
 SENTIMENT_TZ = ZoneInfo(SENTIMENT_TZ_NAME)
 
 DEFAULT_LOOKBACK_HOURS = 48
 BATCH_SIZE = 40                    # messages per OpenAI call
-MAX_MESSAGES_PER_CHANNEL = 2500     # cost guardrail per channel (oldest-first within range)
+MAX_MESSAGES_PER_CHANNEL = 600     # cost guardrail per channel (oldest-first within range)
 MAX_MSG_CHARS = 500                # truncate any one message (e.g. pasted army lists)
 CHANNEL_CONCURRENCY = 4            # channels processed in parallel
 MODEL = "gpt-4o-mini"
@@ -346,13 +347,14 @@ def register(bot, get_db_pool, alias_map: dict, emoji_map: dict):
     @bot.command(
         name="sentiment",
         help="Score faction fan sentiment over a time range and save to DB. "
-             "Usage: !sentiment [faction] [hours] | "
-             "!sentiment [faction] from:YYYY-MM-DD to:YYYY-MM-DD",
+             "Usage: !sentiment [faction ...] [hours] | "
+             "!sentiment [faction ...] from:YYYY-MM-DD to:YYYY-MM-DD. "
+             "No faction = all factions.",
     )
     async def sentiment(ctx, *args):
         hours = None
         start_arg = end_arg = None
-        faction_arg = None
+        faction_args: list[str] = []
         for a in args:
             kw, val = _split_kw(a)
             if kw in FROM_KEYS and val:
@@ -362,7 +364,7 @@ def register(bot, get_db_pool, alias_map: dict, emoji_map: dict):
             elif a.isdigit():
                 hours = max(1, int(a))
             else:
-                faction_arg = a
+                faction_args.append(a)
 
         # resolve the collection window
         now = datetime.now(timezone.utc)
@@ -393,14 +395,27 @@ def register(bot, get_db_pool, alias_map: dict, emoji_map: dict):
                                   "Check SENTIMENT_GUILD_ID / category, or add "
                                   "FACTION_CHANNEL_OVERRIDES.")
 
-        if faction_arg:
-            canon = alias_map.get(faction_arg.lower())
-            if not canon:
-                return await ctx.send(f":warning: Unknown faction '{faction_arg}'.")
-            if canon not in channel_map:
-                return await ctx.send(f":warning: No channel found for **{canon}** "
-                                      f"in that server.")
-            targets = {canon: channel_map[canon]}
+        if faction_args:
+            targets = {}
+            unknown, no_channel = [], []
+            for f in faction_args:
+                canon = alias_map.get(f.lower())
+                if not canon:
+                    unknown.append(f)
+                elif canon not in channel_map:
+                    no_channel.append(canon)
+                elif canon not in targets:      # de-dupe repeated aliases
+                    targets[canon] = channel_map[canon]
+            problems = []
+            if unknown:
+                problems.append("unknown: " + ", ".join(unknown))
+            if no_channel:
+                problems.append("no channel: " + ", ".join(no_channel))
+            if not targets:
+                return await ctx.send(":warning: No usable factions "
+                                      f"({'; '.join(problems)}).")
+            if problems:
+                await ctx.send(f":warning: Skipping {'; '.join(problems)}.")
         else:
             targets = channel_map
 
@@ -462,7 +477,10 @@ def register(bot, get_db_pool, alias_map: dict, emoji_map: dict):
         await status.edit(content=":white_check_mark: Done — saved to the database.")
         await ctx.send(embed=embed)
 
-        if faction_arg and results and results[0]["summary"]:
-            await ctx.send(f"**{results[0]['faction']}** — {results[0]['summary']}")
+        # when specific factions were named, show each one's written summary
+        if faction_args:
+            for r in results:
+                if r["summary"]:
+                    await ctx.send(f"**{r['faction']}** — {r['summary']}")
 
     return sentiment
