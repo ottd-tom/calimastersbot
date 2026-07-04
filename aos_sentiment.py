@@ -71,7 +71,7 @@ SENTIMENT_TZ = ZoneInfo(SENTIMENT_TZ_NAME)
 
 DEFAULT_LOOKBACK_HOURS = 48
 BATCH_SIZE = 40                    # messages per OpenAI call
-MAX_MESSAGES_PER_CHANNEL = 600     # cost guardrail per channel (oldest-first within range)
+MAX_MESSAGES_PER_CHANNEL = 2000     # cost guardrail per channel (oldest-first within range)
 MAX_MSG_CHARS = 500                # truncate any one message (e.g. pasted army lists)
 CHANNEL_CONCURRENCY = 4            # channels processed in parallel
 MODEL = "gpt-4o-mini"
