@@ -273,8 +273,8 @@ def _build_rolling_chart(faction: str, points: list[dict], window: int, release_
     help='Post a rolling win-rate chart for a faction. Usage: !rollwr <faction_alias> [28|70]'
 )
 async def rollwr_cmd(ctx, alias: str, window_arg: str = '28'):
-    if ctx.guild.id == AOS_COACH_SERVER_ID and ctx.channel.id == 769134467805216829:
-        return await ctx.send(f"Please use <#{BOT_ACTIONS_CHANNEL_ID}> for bot commands!")
+   # if ctx.guild.id == AOS_COACH_SERVER_ID and ctx.channel.id == 769134467805216829:
+   #     return await ctx.send(f"Please use <#{BOT_ACTIONS_CHANNEL_ID}> for bot commands!")
     
     
     # Validate window
