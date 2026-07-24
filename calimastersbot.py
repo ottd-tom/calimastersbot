@@ -442,7 +442,7 @@ ALIAS_MAP        = {
     'ko': 'Kharadron Overlords', 'kharadron overlords': 'Kharadron Overlords',
     'nh': 'Nighthaunt', 'ghosts': 'Nighthaunt',
     'rats': 'Skaven', 'skaven': 'Skaven',
-    'kb': 'Kruleboyz', 'kruleboyz': 'Kruleboyz',
+    'kb': 'Kruleboyz', 'kruleboyz': 'Kruleboyz', 'kbz' : 'Kruleboyz",
     'fs': 'Fyreslayers', 'fyreslayers': 'Fyreslayers',
     'gitz': 'Gloomspite Gitz', 'gloomspite gitz': 'Gloomspite Gitz',
     'hoh' : 'Helsmiths of Hashut', 'helsmiths': 'Helsmiths of Hashut', 'chorfs': 'Helsmiths of Hashut'
