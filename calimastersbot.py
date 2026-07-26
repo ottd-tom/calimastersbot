@@ -2198,16 +2198,17 @@ async def generateteam_cmd(ctx, days: int = 30):
     await ctx.send("Done. :crossed_swords:")
 
 ghbmissions = {
-    "Passing Seasons",
-    "Roiling Roots",
-    "Cyclic Shifts",
-    "Surge of Slaughter",
-    "Linked Ley Lines",
-    "The Liferoots",
-    "Bountiful Equinox",
-    "Lifecycle",
-    "Creeping Corruption",
-    "Grasp of Thorns"
+    "Into the Fire",
+    "Bloodstained Coasts",
+    "Avalanch of Ash",
+    "Caverns of Slaughter",
+    "What's Yours is Ours",
+    "Warped Ruins",
+    "Curse of the Gnaw",
+    "Sieze the Embers",
+    "Treacherous Ground",
+    "Escape from the Coast" 
+    "Power of the Realms"
 }
 @aos_bot.command(
     name='thommoisinadequate',
