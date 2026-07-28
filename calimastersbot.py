@@ -1573,6 +1573,7 @@ tombot_phrase_weights = [
     ("A gentleman never rolls his opponents dice", 1),
     ("give them the business", 1),
     ("Man I love nuts",1),
+    ("once in a while i type some of these cringe messages that i crigne while reading back",1),
     (SUN_TZU_AOS_STRAT, 0.000001)
 ]
 
