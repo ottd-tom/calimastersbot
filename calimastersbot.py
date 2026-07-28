@@ -268,11 +268,6 @@ def _build_rolling_chart(faction: str, points: list[dict], window: int, release_
     return buf
 
 
-@aos_bot.command(
-    name='rollwr',
-    help='Post a rolling win-rate chart for a faction. Usage: !rollwr <faction_alias> [28|70]'
-)
-
 async def _produce_rolling_chart(target_channel, canonical, window):
     """Fetch data, build the chart, and post it to target_channel."""
     async with target_channel.typing():
@@ -365,6 +360,10 @@ class RollWrConfirmView(discord.ui.View):
             return
         await self._run(interaction, channel)
 
+@aos_bot.command(
+    name='rollwr',
+    help='Post a rolling win-rate chart for a faction. Usage: !rollwr <faction_alias> [28|70]'
+)
 async def rollwr_cmd(ctx, alias: str, window_arg: str = '28'):
     # Validate window
     if window_arg not in ('28', '70'):
