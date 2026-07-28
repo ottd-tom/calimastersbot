@@ -272,11 +272,100 @@ def _build_rolling_chart(faction: str, points: list[dict], window: int, release_
     name='rollwr',
     help='Post a rolling win-rate chart for a faction. Usage: !rollwr <faction_alias> [28|70]'
 )
+
+async def _produce_rolling_chart(target_channel, canonical, window):
+    """Fetch data, build the chart, and post it to target_channel."""
+    async with target_channel.typing():
+        url = f"{API_URL.rstrip('/')}/api/aos/rolling_winrates/faction/{quote(canonical)}?window={window}"
+        try:
+            data = await fetch_json(url)
+        except Exception as e:
+            return await target_channel.send(f':x: API error: {e}')
+
+        series_key = f'{window}_all'
+        points = (data.get('series') or {}).get(series_key, [])
+        if not points:
+            return await target_channel.send(
+                f':warning: No rolling win-rate data found for **{canonical}** ({window}-day).'
+            )
+
+        try:
+            release_events = await fetch_json(f"{API_URL.rstrip('/')}/api/aos/release_events")
+        except Exception:
+            release_events = None
+
+        loop = asyncio.get_running_loop()
+        try:
+            buf = await loop.run_in_executor(
+                None, _build_rolling_chart, canonical, points, window, release_events
+            )
+        except ValueError as e:
+            return await target_channel.send(f':warning: {e}')
+        except Exception as e:
+            logging.exception('rollwr chart build failed')
+            return await target_channel.send(f':x: Chart error: {e}')
+
+    filename = f"rollwr_{canonical.replace(' ', '_')}_{window}d.png"
+    await target_channel.send(file=discord.File(buf, filename=filename))
+
+class RollWrConfirmView(discord.ui.View):
+    def __init__(self, ctx, canonical, window, *, timeout=120):
+        super().__init__(timeout=timeout)
+        self.ctx = ctx
+        self.canonical = canonical
+        self.window = window
+        self.message = None  # set after the prompt is sent
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        # Only the person who ran the command may click the buttons.
+        if interaction.user.id != self.ctx.author.id:
+            await interaction.response.send_message(
+                "These buttons aren't for you.", ephemeral=True
+            )
+            return False
+        return True
+
+    def _disable_all(self):
+        for child in self.children:
+            child.disabled = True
+
+    async def on_timeout(self):
+        self._disable_all()
+        if self.message:
+            try:
+                await self.message.edit(content="Timed out — no chart posted.", view=self)
+            except discord.HTTPException:
+                pass
+
+    async def _run(self, interaction: discord.Interaction, target_channel):
+        self._disable_all()
+        self.stop()
+        await interaction.response.edit_message(
+            content=f"Posting chart in {target_channel.mention}…", view=self
+        )
+        await _produce_rolling_chart(target_channel, self.canonical, self.window)
+
+    @discord.ui.button(label="Yes", style=discord.ButtonStyle.danger)
+    async def yes_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._run(interaction, self.ctx.channel)
+
+    @discord.ui.button(label="No", style=discord.ButtonStyle.secondary)
+    async def no_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self._disable_all()
+        self.stop()
+        await interaction.response.edit_message(content="Cancelled — no chart posted.", view=self)
+
+    @discord.ui.button(label="Post in #bot-actions", style=discord.ButtonStyle.success)
+    async def bot_actions_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        channel = self.ctx.guild.get_channel(BOT_ACTIONS_CHANNEL_ID)
+        if channel is None:
+            await interaction.response.send_message(
+                ":x: Couldn't find the #bot-actions channel.", ephemeral=True
+            )
+            return
+        await self._run(interaction, channel)
+
 async def rollwr_cmd(ctx, alias: str, window_arg: str = '28'):
-   # if ctx.guild.id == AOS_COACH_SERVER_ID and ctx.channel.id == 769134467805216829:
-   #     return await ctx.send(f"Please use <#{BOT_ACTIONS_CHANNEL_ID}> for bot commands!")
-    
-    
     # Validate window
     if window_arg not in ('28', '70'):
         return await ctx.send(':warning: Window must be `28` or `70`.')
@@ -287,40 +376,26 @@ async def rollwr_cmd(ctx, alias: str, window_arg: str = '28'):
     if not canonical:
         return await ctx.send(f":warning: Unknown faction `{alias}`. Try an alias like `fec`, `sce`, `dok`…")
 
-    await ctx.typing()
-
-    # Fetch data from the API
-    url = f"{API_URL.rstrip('/')}/api/aos/rolling_winrates/faction/{quote(canonical)}?window={window}"
-    try:
-        data = await fetch_json(url)
-    except Exception as e:
-        return await ctx.send(f':x: API error: {e}')
-
-    series_key = f'{window}_all'
-    points = (data.get('series') or {}).get(series_key, [])
-    if not points:
-        return await ctx.send(f':warning: No rolling win-rate data found for **{canonical}** ({window}-day).')
-
-    # Fetch release events (battlescrolls + book dates) for annotations
-    try:
-        release_events = await fetch_json(f"{API_URL.rstrip('/')}/api/aos/release_events")
-    except Exception:
-        release_events = None
-
-    # Build chart in a thread (matplotlib is CPU-bound)
-    loop = asyncio.get_event_loop()
-    try:
-        buf = await loop.run_in_executor(
-            None, _build_rolling_chart, canonical, points, window, release_events
+    # Gate: on the AoS Coach server, any channel other than #bot-actions requires confirmation.
+    in_gated_server = ctx.guild is not None and ctx.guild.id == AOS_COACH_SERVER_ID
+    if in_gated_server and ctx.channel.id != BOT_ACTIONS_CHANNEL_ID:
+        warning = (
+            "The rolling win-rate command is intended to augment discussion on a faction's "
+            "performance and should only be used as part of lively debate. It is not intended "
+            "as a tool to quickly produce a chart just for the sake of doing so.  If you are "
+            "interested in seeing the rolling win-rates of factions, please visit "
+            "https://aos-events.com/winrate_stats#rolling where you can also find many other "
+            f"useful statistics.  If you must use it in the AoS Coach server, please do so in "
+            f"<#{BOT_ACTIONS_CHANNEL_ID}>.  Spamming the bot for anything other than contribution "
+            "towards discussion may result in moderator action against you.  Are you sure you "
+            "would like to continue?"
         )
-    except ValueError as e:
-        return await ctx.send(f':warning: {e}')
-    except Exception as e:
-        logging.exception('rollwr chart build failed')
-        return await ctx.send(f':x: Chart error: {e}')
+        view = RollWrConfirmView(ctx, canonical, window)
+        view.message = await ctx.send(warning, view=view)
+        return
 
-    filename = f"rollwr_{canonical.replace(' ', '_')}_{window}d.png"
-    await ctx.send(file=discord.File(buf, filename=filename))
+    # Other servers, DMs, or already in #bot-actions: produce directly.
+    await _produce_rolling_chart(ctx.channel, canonical, window)
 
 # ========== Leaderboard Bot Commands ==========
 
