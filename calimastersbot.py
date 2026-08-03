@@ -2308,6 +2308,77 @@ async def thommoisinadequate_cmd(ctx, rounds: int = 5):
 
 
 
+from pathlib import Path
+
+from discord.ext import commands
+
+EXCEL_EXTENSIONS = {".xlsx", ".xls", ".xlsm", ".xlsb"}
+
+
+@aos_bot.command(name="excel")
+@commands.guild_only()
+@commands.cooldown(1, 20, commands.BucketType.user)
+async def find_excel(ctx: commands.Context, *, filename_text: str | None = None):
+    """
+    Search the current channel for Excel attachments.
+
+    Examples:
+        !excel
+        !excel schedule
+        !excel tournament results
+    """
+
+    search_text = filename_text.casefold() if filename_text else None
+    matches: list[tuple] = []
+
+    async with ctx.typing():
+        # Change 5000 if you want a larger or smaller search.
+        async for message in ctx.channel.history(limit=5000):
+            for attachment in message.attachments:
+                filename = attachment.filename
+                extension = Path(filename).suffix.casefold()
+
+                if extension not in EXCEL_EXTENSIONS:
+                    continue
+
+                if search_text and search_text not in filename.casefold():
+                    continue
+
+                matches.append((message, attachment))
+
+                # Prevent the response becoming excessively large.
+                if len(matches) >= 20:
+                    break
+
+            if len(matches) >= 20:
+                break
+
+    if not matches:
+        description = (
+            f' containing `{filename_text}`' if filename_text else ""
+        )
+        await ctx.send(
+            f"No Excel files{description} were found in this channel's "
+            f"last 5,000 messages."
+        )
+        return
+
+    lines = []
+
+    for message, attachment in matches:
+        upload_date = message.created_at.strftime("%Y-%m-%d")
+        lines.append(
+            f"**{attachment.filename}** — "
+            f"{message.author.mention}, {upload_date}\n"
+            f"[Download file]({attachment.url}) · "
+            f"[View message]({message.jump_url})"
+        )
+
+    await ctx.send(
+        f"Found {len(matches)} Excel file(s):\n\n" + "\n\n".join(lines)
+    )
+
+
 @aos_bot.event
 async def on_message(message: discord.Message):
     if message.author.bot or message.guild is None:
