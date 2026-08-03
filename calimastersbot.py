@@ -2328,7 +2328,11 @@ async def on_message(message: discord.Message):
 
 @aos_bot.command(name='excel')
 async def find_excel(ctx):
-    text = 'BCP Sucks'
+    if message.guild.id == SOCAL_AOS_GUILD_ID and message.author.id == BARKER_USER_ID:
+        text = 'BCP Sucks'
+        await ctx.send(text)
+
+    text = 'No Excel files found for this user'
     await ctx.send(text)
 
 
