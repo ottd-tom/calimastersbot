@@ -2308,75 +2308,225 @@ async def thommoisinadequate_cmd(ctx, rounds: int = 5):
 
 
 
+import shlex
 from pathlib import Path
 
+import discord
 from discord.ext import commands
 
+
 EXCEL_EXTENSIONS = {".xlsx", ".xls", ".xlsm", ".xlsb"}
+HISTORY_LIMIT = 5000
+RESULT_LIMIT = 20
 
 
-@aos_bot.command(name="excel")
+async def resolve_member(
+    ctx: commands.Context,
+    member_text: str,
+) -> discord.Member:
+    """
+    Resolve a mention, Discord user ID, username, or server display name.
+    """
+    converter = commands.MemberConverter()
+
+    try:
+        return await converter.convert(ctx, member_text)
+    except commands.MemberNotFound as exc:
+        raise commands.BadArgument(
+            f'I could not find a server member matching "{member_text}".'
+        ) from exc
+
+
+def parse_excel_arguments(raw_arguments: str) -> tuple[str | None, str | None]:
+    """
+    Parse filename terms and a custom from: filter.
+
+    Examples:
+        ""
+        "schedule"
+        "from:@Gareth"
+        'from:"Gareth Thomas"'
+        "schedule from:@Gareth"
+        "schedule from: @Gareth"
+    """
+    try:
+        tokens = shlex.split(raw_arguments)
+    except ValueError as exc:
+        raise commands.BadArgument(
+            "The command contains an unmatched quotation mark."
+        ) from exc
+
+    filename_tokens: list[str] = []
+    member_text: str | None = None
+
+    index = 0
+
+    while index < len(tokens):
+        token = tokens[index]
+
+        if token.casefold() == "from:":
+            # Supports: from: @User
+            index += 1
+
+            if index >= len(tokens):
+                raise commands.BadArgument(
+                    "You must specify a user after `from:`."
+                )
+
+            member_text = tokens[index]
+
+        elif token.casefold().startswith("from:"):
+            # Supports: from:@User or from:"Display Name"
+            member_text = token[len("from:"):].strip()
+
+            if not member_text:
+                raise commands.BadArgument(
+                    "You must specify a user after `from:`."
+                )
+
+        else:
+            filename_tokens.append(token)
+
+        index += 1
+
+    filename_text = " ".join(filename_tokens).strip() or None
+
+    return filename_text, member_text
+
+
+async def send_result_pages(
+    ctx: commands.Context,
+    heading: str,
+    result_lines: list[str],
+) -> None:
+    """
+    Split results into messages that remain under Discord's message limit.
+    """
+    page = heading
+
+    for result in result_lines:
+        addition = f"\n\n{result}"
+
+        if len(page) + len(addition) > 1900:
+            await ctx.send(page)
+            page = result
+        else:
+            page += addition
+
+    if page:
+        await ctx.send(page)
+
+
+@bot.command(name="excel")
 @commands.guild_only()
 @commands.cooldown(1, 20, commands.BucketType.user)
-async def find_excel(ctx: commands.Context, *, filename_text: str | None = None):
+async def find_excel(
+    ctx: commands.Context,
+    *,
+    arguments: str = "",
+):
     """
     Search the current channel for Excel attachments.
 
     Examples:
         !excel
         !excel schedule
-        !excel tournament results
+        !excel from:@Gareth
+        !excel schedule from:@Gareth
+        !excel from:"Gareth Thomas"
     """
+    try:
+        filename_text, member_text = parse_excel_arguments(arguments)
 
-    search_text = filename_text.casefold() if filename_text else None
-    matches: list[tuple] = []
+        selected_member: discord.Member | None = None
+
+        if member_text:
+            selected_member = await resolve_member(ctx, member_text)
+
+    except commands.BadArgument as exc:
+        await ctx.send(f"⚠️ {exc}")
+        return
+
+    filename_search = (
+        filename_text.casefold()
+        if filename_text
+        else None
+    )
+
+    matches: list[tuple[discord.Message, discord.Attachment]] = []
 
     async with ctx.typing():
-        # Change 5000 if you want a larger or smaller search.
-        async for message in ctx.channel.history(limit=5000):
+        async for message in ctx.channel.history(limit=HISTORY_LIMIT):
+
+            # Apply the from: filter.
+            if (
+                selected_member is not None
+                and message.author.id != selected_member.id
+            ):
+                continue
+
             for attachment in message.attachments:
-                filename = attachment.filename
-                extension = Path(filename).suffix.casefold()
+                extension = Path(attachment.filename).suffix.casefold()
 
                 if extension not in EXCEL_EXTENSIONS:
                     continue
 
-                if search_text and search_text not in filename.casefold():
+                if (
+                    filename_search is not None
+                    and filename_search not in attachment.filename.casefold()
+                ):
                     continue
 
                 matches.append((message, attachment))
 
-                # Prevent the response becoming excessively large.
-                if len(matches) >= 20:
+                if len(matches) >= RESULT_LIMIT:
                     break
 
-            if len(matches) >= 20:
+            if len(matches) >= RESULT_LIMIT:
                 break
 
+    filters: list[str] = []
+
+    if filename_text:
+        filters.append(f'filename containing `{filename_text}`')
+
+    if selected_member:
+        filters.append(f"posted by {selected_member.mention}")
+
+    filter_description = (
+        " and ".join(filters)
+        if filters
+        else "matching the request"
+    )
+
     if not matches:
-        description = (
-            f' containing `{filename_text}`' if filename_text else ""
-        )
         await ctx.send(
-            f"No Excel files{description} were found in this channel's "
-            f"last 5,000 messages."
+            f"No Excel files {filter_description} were found in "
+            f"this channel's last {HISTORY_LIMIT:,} messages."
         )
         return
 
-    lines = []
+    result_lines: list[str] = []
 
     for message, attachment in matches:
-        upload_date = message.created_at.strftime("%Y-%m-%d")
-        lines.append(
-            f"**{attachment.filename}** — "
-            f"{message.author.mention}, {upload_date}\n"
-            f"[Download file]({attachment.url}) · "
-            f"[View message]({message.jump_url})"
+        upload_date = discord.utils.format_dt(
+            message.created_at,
+            style="d",
         )
 
-    await ctx.send(
-        f"Found {len(matches)} Excel file(s):\n\n" + "\n\n".join(lines)
+        result_lines.append(
+            f"**{discord.utils.escape_markdown(attachment.filename)}**\n"
+            f"Posted by {message.author.mention} on {upload_date}\n"
+            f"[Open file]({attachment.url}) · "
+            f"[View original message]({message.jump_url})"
+        )
+
+    heading = (
+        f"Found **{len(matches)}** Excel file(s) "
+        f"{filter_description}:"
     )
+
+    await send_result_pages(ctx, heading, result_lines)
 
 
 @aos_bot.event
