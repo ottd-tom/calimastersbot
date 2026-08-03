@@ -2326,7 +2326,10 @@ async def on_message(message: discord.Message):
 
 
 
-
+@aos_bot.command(name='excel')
+async def find_excel(ctx):
+    text = 'BCP Sucks'
+    await ctx.send(text)
 
 
 
