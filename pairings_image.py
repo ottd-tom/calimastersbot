@@ -330,7 +330,7 @@ def render_standings_images(
         return None
 
     return render_table_images(title, subtitle, cols, [list(r) for r in rows],
-                               colorize, rows_per_image=28)
+                               colorize, rows_per_image=60)
 
 
 # ─── Async wrappers (Pillow is blocking; keep it off the event loop) ──────────
