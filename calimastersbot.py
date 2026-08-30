@@ -703,156 +703,115 @@ def _search_matches(events, query):
     return out
 
 
-async def send_standings_table(ctx, ev_name, ev_id, players, metric_names):
-    header_fields = ["Place", "Name"] + metric_names
-    header_line   = " | ".join(header_fields)
-    divider       = "-" * len(header_line)
-    lines = [f"Standings for {ev_name} ({ev_id}):", header_line, divider]
-    for p in players:
-        placing = p.get("placing", "")
-        user    = p.get("user", {})
-        name    = f"{user.get('firstName','')} {user.get('lastName','')}".strip()
-        metric_map = {m['name']: m['value'] for m in p.get('metrics', [])}
-        row = [str(placing), name] + [str(metric_map.get(m, "")) for m in metric_names]
-        lines.append(" | ".join(row))
-    await send_lines(ctx, lines)
 
-async def do_standings_full(ctx, ev):
-    ev_name, ev_id = ev["name"], ev["id"]
-    headers = {'Accept':'application/json','x-api-key':BCP_API_KEY,'client-id':CLIENT_ID,'User-Agent':'AoSBot'}
-    async with aiohttp.ClientSession() as session:
-        async with session.get(f"{BASE_EVENT_URL}/{ev_id}/players",
-                               params={"placings":"true","limit":500},
-                               headers=headers) as presp:
-            presp.raise_for_status(); raw = await presp.json()
-    players = extract_players(raw)
-    if not players:
-        return await ctx.send(f":warning: No players for `{ev_name}` ({ev_id}).")
-    metric_names = [m["name"] for m in players[0].get("metrics",[])]
-    await send_standings_table(ctx, ev_name, ev_id, players, metric_names)
-    await ctx.send(f"View full placings: https://www.bestcoastpairings.com/event/{ev_id}?active_tab=placings")
-
+    return full or "?"
+ 
+ 
+def _metric_map(p: dict) -> dict:
+    """p['metrics'] can be missing OR present-but-None."""
+    return {m.get("name"): m.get("value") for m in (p.get("metrics") or [])}
+ 
+ 
+def _cell(value) -> str:
+    return "" if value is None else str(value)
+ 
+ 
+async def _send_standings(ctx, ev_name, ev_id, title_sub, metric_names, rows,
+                          faction_col, text_lines):
+    """Try image first, fall back to the existing text output."""
+    if USE_IMAGES:
+        try:
+            buffers = await render_standings_images_async(
+                ev_name, title_sub, metric_names, rows, faction_col=faction_col
+            )
+            files = [
+                discord.File(buf, filename=f"standings_{i}.png")
+                for i, buf in enumerate(buffers, 1)
+            ]
+            for i in range(0, len(files), 10):   # Discord allows 10 attachments per message
+                await ctx.send(files=files[i:i + 10])
+            return
+        except Exception:
+            logging.exception("Standings image render failed, falling back to text")
+ 
+    await send_lines(ctx, text_lines)
+ 
+ 
 async def do_standings_slim(ctx, ev):
     ev_name, ev_id = ev["name"], ev["id"]
-    headers = {'Accept':'application/json','x-api-key':BCP_API_KEY,'client-id':CLIENT_ID,'User-Agent':'AoSBot'}
+    headers = {'Accept': 'application/json', 'x-api-key': BCP_API_KEY,
+               'client-id': CLIENT_ID, 'User-Agent': 'AoSBot'}
     async with aiohttp.ClientSession() as session:
         async with session.get(f"{BASE_EVENT_URL}/{ev_id}/players",
-                               params={"placings":"true","limit":500},
+                               params={"placings": "true", "limit": 500},
                                headers=headers) as presp:
-            presp.raise_for_status(); raw = await presp.json()
+            presp.raise_for_status()
+            raw = await presp.json()
+ 
     players = extract_players(raw)
     if not players:
         return await ctx.send(f":warning: No players for `{ev_name}` ({ev_id}).")
-    first_metrics = [m["name"] for m in players[0].get("metrics",[])]
+ 
+    first_metrics = [m["name"] for m in (players[0].get("metrics") or [])]
     if "Wins" not in first_metrics:
         return await ctx.send(f":warning: No “Wins” metric in `{ev_name}` ({ev_id}).")
-    header = "Place | Faction | Name                     | Wins"
-    divider = "-" * len(header)
-    lines = [f"Standings for {ev_name} ({ev_id}):", header, divider]
+ 
+    rows = []
     for p in players:
-        placing = p["placing"]
-        full_faction = p.get("faction",{}).get("name","")
-        faction_alias = get_shortest_alias(full_faction)
-        user = p["user"]
-        name = f"{user['firstName']} {user['lastName']}"
-        metric_map = {m["name"]: m["value"] for m in p["metrics"]}
-        wins = metric_map.get("Wins", "")
-        lines.append(f"{placing:<5} | {faction_alias:<7} | {name:<24} | {wins:^4}")
-    await send_lines(ctx, lines)
+        faction = get_shortest_alias((p.get("faction") or {}).get("name", ""))
+        rows.append((
+            _cell(p.get("placing")),
+            faction,
+            _player_name(p),
+            _cell(_metric_map(p).get("Wins")),
+        ))
+ 
+    header = "Place | Faction | Name                     | Wins"
+    text_lines = [f"Standings for {ev_name} ({ev_id}):", header, "-" * len(header)]
+    text_lines += [f"{pl:<5} | {fa:<7} | {nm:<24} | {wn:^4}" for pl, fa, nm, wn in rows]
+ 
+    await _send_standings(
+        ctx, ev_name, ev_id,
+        f"Standings · {len(rows)} player{'s' if len(rows) != 1 else ''}",
+        ["Wins"], rows, faction_col=True, text_lines=text_lines,
+    )
+    await ctx.send(f"View full placings: https://www.bestcoastpairings.com/event/{ev_id}?active_tab=placings")
+ 
+ 
+async def do_standings_full(ctx, ev):
+    ev_name, ev_id = ev["name"], ev["id"]
+    headers = {'Accept': 'application/json', 'x-api-key': BCP_API_KEY,
+               'client-id': CLIENT_ID, 'User-Agent': 'AoSBot'}
+    async with aiohttp.ClientSession() as session:
+        async with session.get(f"{BASE_EVENT_URL}/{ev_id}/players",
+                               params={"placings": "true", "limit": 500},
+                               headers=headers) as presp:
+            presp.raise_for_status()
+            raw = await presp.json()
+ 
+    players = extract_players(raw)
+    if not players:
+        return await ctx.send(f":warning: No players for `{ev_name}` ({ev_id}).")
+ 
+    metric_names = [m["name"] for m in (players[0].get("metrics") or [])]
+ 
+    rows = []
+    for p in players:
+        mm = _metric_map(p)
+        rows.append([_cell(p.get("placing")), _player_name(p)]
+                    + [_cell(mm.get(m)) for m in metric_names])
+ 
+    header_line = " | ".join(["Place", "Name"] + metric_names)
+    text_lines = [f"Standings for {ev_name} ({ev_id}):", header_line, "-" * len(header_line)]
+    text_lines += [" | ".join(r) for r in rows]
+ 
+    await _send_standings(
+        ctx, ev_name, ev_id,
+        f"Full standings · {len(rows)} player{'s' if len(rows) != 1 else ''}",
+        metric_names, rows, faction_col=False, text_lines=text_lines,
+    )
     await ctx.send(f"View full placings: https://www.bestcoastpairings.com/event/{ev_id}?active_tab=placings")
 
-@aos_bot.command(name='standings', help='Current standings at event')
-async def standings_slim_cmd(ctx, *, args: str):
-    parts = args.split(maxsplit=1)
-    requested_round = None
-    query = args
-
-    if len(parts) == 2 and parts[0].isdigit():
-        rnd = int(parts[0])
-        if 1 <= rnd <= 8:
-            requested_round = rnd
-            query = parts[1]
-        else:
-            return await ctx.send(":warning: Round must be 1–8.")
-
-    if len(query.strip()) < 4:
-        return await ctx.send(":warning: Please use at least 4 characters for your search.")
-
-    today    = datetime.utcnow().date() + timedelta(days=3)
-    week_ago = today - timedelta(days=7)
-    params = {
-        "limit":        100,
-        "sortAscending":"true",
-        "sortKey":      "eventDate",
-        "startDate":    week_ago.isoformat(),
-        "endDate":      today.isoformat(),
-        "gameType":     "4",
-    }
-    headers = {
-        "Accept":     "application/json",
-        "x-api-key":  BCP_API_KEY,
-        "client-id":  CLIENT_ID,
-        "User-Agent": "AoSBot/1.0",
-    }
-
-    async with aiohttp.ClientSession() as session:
-        async with session.get(BASE_EVENT_URL, params=params, headers=headers) as resp:
-            resp.raise_for_status()
-            events = (await resp.json()).get("data", [])
-
-    matches = _search_matches(events, query)
-
-    if not matches:
-        return await ctx.send(f":mag: No AoS events this week matching `{query}`.")
-    if len(matches) == 1:
-        return await do_standings_slim(ctx, matches[0])
-    await ctx.send("Multiple events found—please pick one:", view=StandingsView(matches, slim=True, ctx=ctx))
-
-@aos_bot.command(name='standingsfull', help='Full standings info')
-async def standings_full_cmd(ctx, *, args: str):
-    parts = args.split(maxsplit=1)
-    requested_round = None
-    query = args
-
-    if len(parts) == 2 and parts[0].isdigit():
-        rnd = int(parts[0])
-        if 1 <= rnd <= 8:
-            requested_round = rnd
-            query = parts[1]
-        else:
-            return await ctx.send(":warning: Round must be 1–8.")
-
-    if len(query.strip()) < 4:
-        return await ctx.send(":warning: Please use at least 4 characters for your search.")
-
-    today    = datetime.utcnow().date() + timedelta(days=3)
-    week_ago = today - timedelta(days=7)
-    params = {
-        "limit":        100,
-        "sortAscending":"true",
-        "sortKey":      "eventDate",
-        "startDate":    week_ago.isoformat(),
-        "endDate":      today.isoformat(),
-        "gameType":     "4",
-    }
-    headers = {
-        "Accept":     "application/json",
-        "x-api-key":  BCP_API_KEY,
-        "client-id":  CLIENT_ID,
-        "User-Agent": "AoSBot/1.0",
-    }
-
-    async with aiohttp.ClientSession() as session:
-        async with session.get(BASE_EVENT_URL, params=params, headers=headers) as resp:
-            resp.raise_for_status()
-            events = (await resp.json()).get("data", [])
-
-    matches = _search_matches(events, query)
-    if not matches:
-        return await ctx.send(f":mag: No AoS events this week matching `{query}`.")
-    if len(matches) == 1:
-        return await do_standings_full(ctx, matches[0])
-    await ctx.send("Multiple events found—please pick one:", view=StandingsView(matches, slim=False, ctx=ctx))
 
 # ─── Pairings Command ─────────────────────────────────────────────────────────
 
