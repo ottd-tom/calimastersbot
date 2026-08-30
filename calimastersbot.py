@@ -854,6 +854,11 @@ async def do_standings_full(ctx, ev):
     if len(matches) == 1:
         return await do_standings_slim(ctx, matches[0])
     await ctx.send("Multiple events found—please pick one:", view=StandingsView(matches, slim=True, ctx=ctx))
+
+
+@aos_bot.command(name='standings', help='Current standings at event')
+async def standings_slim_cmd(ctx, *, args: str):
+    parts = args.split(maxsplit=1)
  
 @aos_bot.command(name='standingsfull', help='Full standings info')
 async def standings_full_cmd(ctx, *, args: str):
