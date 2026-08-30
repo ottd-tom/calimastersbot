@@ -882,6 +882,29 @@ class PairingsView(discord.ui.View):
         super().__init__(timeout=60)
         self.add_item(PairingsSelect(events, ctx, first_names=first_names, requested_round=requested_round))
 
+# ─── Drop-in replacement for do_pairings ──────────────────────────────────────
+#
+#   from pairings_image import render_pairings_images_async, fonts_available
+#
+
+from pairings_image import render_pairings_images_async, fonts_available
+
+USE_IMAGES = fonts_available()   # evaluated once at import; falls back to text if False
+
+
+def _pts(pairing: dict, key: str) -> str:
+    """p['player1Game'] can be missing OR present-but-None — .get(k, {}) doesn't cover the latter."""
+    game = pairing.get(key) or {}
+    val = game.get("points")
+    return "" if val is None else str(val)
+
+
+def _name(side: dict | None) -> str:
+    user = (side or {}).get("user") or {}
+    full = f"{user.get('firstName', '')} {user.get('lastName', '')}".strip()
+    return full or "?"
+
+
 async def do_pairings(ctx, ev, requested_round: int | None = None, first_names: set[str] | None = None):
     ev_name, ev_id = ev["name"], ev["id"]
     headers = {
@@ -916,32 +939,60 @@ async def do_pairings(ctx, ev, requested_round: int | None = None, first_names: 
     # Optional first-name filter
     if first_names:
         want = {n.strip().lower() for n in first_names if n.strip()}
+
         def hit(p):
             u1 = (p.get("player1") or {}).get("user") or {}
             if (u1.get("firstName") or "").lower() in want:
                 return True
             u2 = (p.get("player2") or {}).get("user") or {}
             return (u2.get("firstName") or "").lower() in want
+
         pairings = [p for p in pairings if hit(p)]
         if not pairings:
             return await ctx.send(f":mag: No pairings in round {chosen_round} for requested names at `{ev_name}`.")
 
-    header = f"Pairings for {ev_name} ({ev_id}) — Round {chosen_round}" + (" [filtered]" if first_names else "")
-    cols    = "Player 1 Name         | Pts | Player 2 Name         | Pts"
-    divider = "-" * len(cols)
+    # --- build rows once, render either way ----------------------------------
+    def _table_no(p):
+        t = p.get("table") or p.get("tableNumber") or ""
+        return str(t)
 
-    lines = [header, cols, divider]
-    for p in pairings:
-        u1 = p["player1"]["user"]; name1 = f"{u1['firstName']} {u1['lastName']}"
-        pts1 = p.get("player1Game", {}).get("points", "")
+    rows = []
+    for p in sorted(pairings, key=lambda p: int(_table_no(p) or 0)):
+        name1 = _name(p.get("player1"))
+        pts1 = _pts(p, "player1Game")
         if p.get("player2"):
-            u2 = p["player2"]["user"]; name2 = f"{u2['firstName']} {u2['lastName']}"
-            pts2 = p.get("player2Game", {}).get("points", "")
+            name2, pts2 = _name(p.get("player2")), _pts(p, "player2Game")
         else:
             name2, pts2 = "(bye)", ""
-        lines.append(f"{name1:<22} | {pts1:^3} | {name2:<22} | {pts2:^3}")
+        rows.append((_table_no(p), name1, pts1, name2, pts2))
 
-    await send_lines(ctx, lines)
+    subtitle = f"Round {chosen_round} · {len(rows)} pairing{'s' if len(rows) != 1 else ''}"
+    if first_names:
+        subtitle += " · filtered"
+
+    sent_image = False
+    if USE_IMAGES:
+        try:
+            buffers = await render_pairings_images_async(ev_name, subtitle, rows)
+            files = [
+                discord.File(buf, filename=f"pairings_r{chosen_round}_{i}.png")
+                for i, buf in enumerate(buffers, 1)
+            ]
+            # Discord allows 10 attachments per message
+            for i in range(0, len(files), 10):
+                await ctx.send(files=files[i:i + 10])
+            sent_image = True
+        except Exception:
+            logging.exception("Pairings image render failed, falling back to text")
+
+    if not sent_image:
+        header = f"Pairings for {ev_name} ({ev_id}) — Round {chosen_round}" + (" [filtered]" if first_names else "")
+        cols = "Player 1 Name         | Pts | Player 2 Name         | Pts"
+        lines = [header, cols, "-" * len(cols)]
+        for _, n1, p1, n2, p2 in rows:
+            lines.append(f"{n1:<22} | {p1:^3} | {n2:<22} | {p2:^3}")
+        await send_lines(ctx, lines)
+
     if not first_names:
         await ctx.send(f"View full pairings: https://www.bestcoastpairings.com/event/{ev_id}?active_tab=pairings")
 
