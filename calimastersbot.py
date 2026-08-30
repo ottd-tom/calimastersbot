@@ -704,18 +704,28 @@ def _search_matches(events, query):
 
 
 
+# =============================================================================
+# Paste this over the region of main.py that runs from the orphaned
+#     return full or "?"
+# (just after _search_matches) down to the end of standings_full_cmd,
+# i.e. the line ending:  view=StandingsView(matches, slim=False, ctx=ctx))
+# =============================================================================
+
+def _player_name(p: dict) -> str:
+    user = p.get("user") or {}
+    full = f"{user.get('firstName', '')} {user.get('lastName', '')}".strip()
     return full or "?"
- 
- 
+
+
 def _metric_map(p: dict) -> dict:
     """p['metrics'] can be missing OR present-but-None."""
     return {m.get("name"): m.get("value") for m in (p.get("metrics") or [])}
- 
- 
+
+
 def _cell(value) -> str:
     return "" if value is None else str(value)
- 
- 
+
+
 async def _send_standings(ctx, ev_name, ev_id, title_sub, metric_names, rows,
                           faction_col, text_lines):
     """Try image first, fall back to the existing text output."""
@@ -733,10 +743,10 @@ async def _send_standings(ctx, ev_name, ev_id, title_sub, metric_names, rows,
             return
         except Exception:
             logging.exception("Standings image render failed, falling back to text")
- 
+
     await send_lines(ctx, text_lines)
- 
- 
+
+
 async def do_standings_slim(ctx, ev):
     ev_name, ev_id = ev["name"], ev["id"]
     headers = {'Accept': 'application/json', 'x-api-key': BCP_API_KEY,
@@ -747,15 +757,15 @@ async def do_standings_slim(ctx, ev):
                                headers=headers) as presp:
             presp.raise_for_status()
             raw = await presp.json()
- 
+
     players = extract_players(raw)
     if not players:
         return await ctx.send(f":warning: No players for `{ev_name}` ({ev_id}).")
- 
+
     first_metrics = [m["name"] for m in (players[0].get("metrics") or [])]
     if "Wins" not in first_metrics:
         return await ctx.send(f":warning: No “Wins” metric in `{ev_name}` ({ev_id}).")
- 
+
     rows = []
     for p in players:
         faction = get_shortest_alias((p.get("faction") or {}).get("name", ""))
@@ -765,19 +775,19 @@ async def do_standings_slim(ctx, ev):
             _player_name(p),
             _cell(_metric_map(p).get("Wins")),
         ))
- 
+
     header = "Place | Faction | Name                     | Wins"
     text_lines = [f"Standings for {ev_name} ({ev_id}):", header, "-" * len(header)]
     text_lines += [f"{pl:<5} | {fa:<7} | {nm:<24} | {wn:^4}" for pl, fa, nm, wn in rows]
- 
+
     await _send_standings(
         ctx, ev_name, ev_id,
         f"Standings · {len(rows)} player{'s' if len(rows) != 1 else ''}",
         ["Wins"], rows, faction_col=True, text_lines=text_lines,
     )
     await ctx.send(f"View full placings: https://www.bestcoastpairings.com/event/{ev_id}?active_tab=placings")
- 
- 
+
+
 async def do_standings_full(ctx, ev):
     ev_name, ev_id = ev["name"], ev["id"]
     headers = {'Accept': 'application/json', 'x-api-key': BCP_API_KEY,
@@ -788,43 +798,46 @@ async def do_standings_full(ctx, ev):
                                headers=headers) as presp:
             presp.raise_for_status()
             raw = await presp.json()
- 
+
     players = extract_players(raw)
     if not players:
         return await ctx.send(f":warning: No players for `{ev_name}` ({ev_id}).")
- 
+
     metric_names = [m["name"] for m in (players[0].get("metrics") or [])]
- 
+
     rows = []
     for p in players:
         mm = _metric_map(p)
         rows.append([_cell(p.get("placing")), _player_name(p)]
                     + [_cell(mm.get(m)) for m in metric_names])
- 
+
     header_line = " | ".join(["Place", "Name"] + metric_names)
     text_lines = [f"Standings for {ev_name} ({ev_id}):", header_line, "-" * len(header_line)]
     text_lines += [" | ".join(r) for r in rows]
- 
+
     await _send_standings(
         ctx, ev_name, ev_id,
         f"Full standings · {len(rows)} player{'s' if len(rows) != 1 else ''}",
         metric_names, rows, faction_col=False, text_lines=text_lines,
     )
     await ctx.send(f"View full placings: https://www.bestcoastpairings.com/event/{ev_id}?active_tab=placings")
-    requested_round = None
+
+
+@aos_bot.command(name='standings', help='Current standings at event')
+async def standings_slim_cmd(ctx, *, args: str):
+    parts = args.split(maxsplit=1)
     query = args
- 
+
     if len(parts) == 2 and parts[0].isdigit():
         rnd = int(parts[0])
         if 1 <= rnd <= 8:
-            requested_round = rnd
             query = parts[1]
         else:
             return await ctx.send(":warning: Round must be 1–8.")
- 
+
     if len(query.strip()) < 4:
         return await ctx.send(":warning: Please use at least 4 characters for your search.")
- 
+
     today    = datetime.utcnow().date() + timedelta(days=3)
     week_ago = today - timedelta(days=7)
     params = {
@@ -841,14 +854,13 @@ async def do_standings_full(ctx, ev):
         "client-id":  CLIENT_ID,
         "User-Agent": "AoSBot/1.0",
     }
- 
+
     async with aiohttp.ClientSession() as session:
         async with session.get(BASE_EVENT_URL, params=params, headers=headers) as resp:
             resp.raise_for_status()
             events = (await resp.json()).get("data", [])
- 
+
     matches = _search_matches(events, query)
- 
     if not matches:
         return await ctx.send(f":mag: No AoS events this week matching `{query}`.")
     if len(matches) == 1:
@@ -856,27 +868,21 @@ async def do_standings_full(ctx, ev):
     await ctx.send("Multiple events found—please pick one:", view=StandingsView(matches, slim=True, ctx=ctx))
 
 
-@aos_bot.command(name='standings', help='Current standings at event')
-async def standings_slim_cmd(ctx, *, args: str):
-    parts = args.split(maxsplit=1)
- 
 @aos_bot.command(name='standingsfull', help='Full standings info')
 async def standings_full_cmd(ctx, *, args: str):
     parts = args.split(maxsplit=1)
-    requested_round = None
     query = args
- 
+
     if len(parts) == 2 and parts[0].isdigit():
         rnd = int(parts[0])
         if 1 <= rnd <= 8:
-            requested_round = rnd
             query = parts[1]
         else:
             return await ctx.send(":warning: Round must be 1–8.")
- 
+
     if len(query.strip()) < 4:
         return await ctx.send(":warning: Please use at least 4 characters for your search.")
- 
+
     today    = datetime.utcnow().date() + timedelta(days=3)
     week_ago = today - timedelta(days=7)
     params = {
@@ -893,12 +899,12 @@ async def standings_full_cmd(ctx, *, args: str):
         "client-id":  CLIENT_ID,
         "User-Agent": "AoSBot/1.0",
     }
- 
+
     async with aiohttp.ClientSession() as session:
         async with session.get(BASE_EVENT_URL, params=params, headers=headers) as resp:
             resp.raise_for_status()
             events = (await resp.json()).get("data", [])
- 
+
     matches = _search_matches(events, query)
     if not matches:
         return await ctx.send(f":mag: No AoS events this week matching `{query}`.")
@@ -939,7 +945,11 @@ class PairingsView(discord.ui.View):
 #   from pairings_image import render_pairings_images_async, fonts_available
 #
 
-from pairings_image import render_pairings_images_async, fonts_available
+from pairings_image import (
+    render_pairings_images_async,
+    render_standings_images_async,
+    fonts_available,
+)
 
 USE_IMAGES = fonts_available()   # evaluated once at import; falls back to text if False
 
