@@ -7,3 +7,4 @@ google-generativeai
 Pillow
 asyncpg
 matplotlib
+Pillow>=11.0
