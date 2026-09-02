@@ -1138,11 +1138,11 @@ SCIONS: dict[str, str] = {
     "ZAdKiz9Koi": "Tom Guan",
     "KWH5QP65BC": "E Pryor",
     "KN49AJT661": "Adam Beautement",
-    "yzOjNlI0zo", "Kyle Calip",
-    "fZ7CI3Kh4k", "Greg Brewer",
-    "H1HUGJ6LKX", "Ivan Blanco",
-    "H6ADLP5H39", "Franz Ocampo",
-    "1QY8G7178X", "Jo Cooper",
+    "yzOjNlI0zo": "Kyle Calip",
+    "fZ7CI3Kh4k": "Greg Brewer",
+    "H1HUGJ6LKX": "Ivan Blanco",
+    "H6ADLP5H39": "Franz Ocampo",
+    "1QY8G7178X": "Jo Cooper",
     # "GhIjKl789012": "Bob Jones",
 }
 
