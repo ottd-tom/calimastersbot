@@ -1134,7 +1134,15 @@ import time
 # --- Roster -----------------------------------------------------------------
 # Fill this in with `!scionid <name>`. Key = BCP userId, value = display name.
 SCIONS: dict[str, str] = {
-    # "AbCdEf123456": "Alice Smith",
+    "AQJEPFL9X9": "Brian Horton",
+    "ZAdKiz9Koi": "Tom Guan",
+    "KWH5QP65BC": "E Pryor",
+    "KN49AJT661": "Adam Beautement",
+    "yzOjNlI0zo", "Kyle Calip",
+    "fZ7CI3Kh4k", "Greg Brewer",
+    "H1HUGJ6LKX", "Ivan Blanco",
+    "H6ADLP5H39", "Franz Ocampo",
+    "1QY8G7178X", "Jo Cooper",
     # "GhIjKl789012": "Bob Jones",
 }
 
