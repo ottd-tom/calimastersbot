@@ -1125,7 +1125,348 @@ async def pairings_cmd(ctx, *, args: str):
     )
 
 
+# =============================================================================
+# Scion Tracker
+# =============================================================================
 
+import time
+
+# --- Roster -----------------------------------------------------------------
+# Fill this in with `!scionid <name>`. Key = BCP userId, value = display name.
+SCIONS: dict[str, str] = {
+    # "AbCdEf123456": "Alice Smith",
+    # "GhIjKl789012": "Bob Jones",
+}
+
+SCION_LOOKBACK_DAYS    = 2      # events that started up to N days ago
+SCION_LOOKAHEAD_DAYS   = 1      # ...through N days ahead (timezone slop)
+SCION_MAX_ROUNDS       = 8
+SCION_CONCURRENCY      = 5      # simultaneous BCP requests
+SCION_SKIP_TEAM_EVENTS = True   # team/doubles pairings have a different shape
+SCION_CACHE_TTL        = 60     # seconds; stops the command being spammed
+
+_scion_cache: dict[tuple, tuple[float, list[str]]] = {}
+
+
+def _bcp_headers(user_agent: str = "AoS-ScionTracker") -> dict:
+    return {
+        "Accept":     "application/json",
+        "x-api-key":  BCP_API_KEY,
+        "client-id":  CLIENT_ID,
+        "User-Agent": user_agent,
+    }
+
+
+async def _bcp_get(session, url, params, sem):
+    async with sem:
+        async with session.get(url, params=params, headers=_bcp_headers()) as resp:
+            resp.raise_for_status()
+            return await resp.json()
+
+
+def _user_id_of(obj) -> str | None:
+    """
+    Pull a BCP userId out of a player or pairing-side object.
+
+    BCP isn't consistent about where this lives (top-level `userId` on placings,
+    sometimes nested under `user`), so try the plausible spots rather than
+    assuming one shape.
+    """
+    if not obj:
+        return None
+    for key in ("userId", "user_id"):
+        v = obj.get(key)
+        if v:
+            return str(v)
+    user = obj.get("user") or {}
+    for key in ("id", "userId", "_id"):
+        v = user.get(key)
+        if v:
+            return str(v)
+    return None
+
+
+def _event_max_round(ev: dict) -> int:
+    for key in ("numberOfRounds", "rounds", "totalRounds", "numRounds"):
+        v = ev.get(key)
+        if isinstance(v, int) and 1 <= v <= SCION_MAX_ROUNDS:
+            return v
+    return SCION_MAX_ROUNDS
+
+
+def _record_of(p: dict) -> str:
+    mm = _metric_map(p)
+    w = mm.get("Wins")
+    l = mm.get("Losses")
+    d = mm.get("Draws", mm.get("Ties"))
+    if w is None and l is None:
+        return ""
+    parts = [str(w or 0), str(l or 0)]
+    if d not in (None, 0, "0"):
+        parts.append(str(d))
+    return "-".join(parts)
+
+
+def _faction_of(p: dict) -> str:
+    return get_shortest_alias((p.get("faction") or {}).get("name", "") or "")
+
+
+def _side_points(pairing: dict, key: str):
+    return (pairing.get(key) or {}).get("points")
+
+
+def _result_str(my_game: dict | None, opp_game: dict | None) -> str:
+    """W / L / D, or '·' if the game isn't scored yet."""
+    r = (my_game or {}).get("gameResult")
+    if isinstance(r, str) and r.strip():
+        return r.strip()[0].upper()
+    # Observed integer coding on BCP: 1=win, 2=loss, 3=draw. Verify against your
+    # own data before trusting it; the points comparison below is the fallback.
+    if isinstance(r, int) and r in (1, 2, 3):
+        return {1: "W", 2: "L", 3: "D"}[r]
+    a = (my_game or {}).get("points")
+    b = (opp_game or {}).get("points")
+    if a is None or b is None:
+        return "·"
+    if a > b:
+        return "W"
+    if a < b:
+        return "L"
+    return "D"
+
+
+def _table_of(p: dict) -> str:
+    return str(p.get("table") or p.get("tableNumber") or "?")
+
+
+async def _fetch_live_events(session, sem, days_back: int) -> list[dict]:
+    today = datetime.utcnow().date()
+    params = {
+        "limit":         100,
+        "sortAscending": "true",
+        "sortKey":       "eventDate",
+        "startDate":     (today - timedelta(days=days_back)).isoformat(),
+        "endDate":       (today + timedelta(days=SCION_LOOKAHEAD_DAYS)).isoformat(),
+        "gameType":      "4",
+    }
+    data = await _bcp_get(session, BASE_EVENT_URL, params, sem)
+    events = data.get("data", [])
+    if SCION_SKIP_TEAM_EVENTS:
+        events = [e for e in events if not (e.get("teamEvent") or e.get("doublesEvent"))]
+    return events
+
+
+async def _scan_event(session, ev, sem) -> dict | None:
+    """
+    One /players call decides whether this event matters. Only events with a
+    scion registered pay for pairing lookups.
+    """
+    try:
+        raw = await _bcp_get(
+            session,
+            f"{BASE_EVENT_URL}/{ev['id']}/players",
+            {"placings": "true", "limit": 500},
+            sem,
+        )
+    except Exception:
+        logging.exception("sciontracker: player fetch failed for %s", ev.get("id"))
+        return None
+
+    players = extract_players(raw)
+    by_uid = {}
+    for p in players:
+        uid = _user_id_of(p)
+        if uid:
+            by_uid[uid] = p
+
+    present = [uid for uid in SCIONS if uid in by_uid]
+    if not present:
+        return None
+
+    # Walk rounds backwards to find the most recent one with pairings posted.
+    rnd, pairings = None, []
+    for candidate in range(_event_max_round(ev), 0, -1):
+        try:
+            raw_p = await _bcp_get(
+                session,
+                f"{BASE_EVENT_URL}/{ev['id']}/pairings",
+                {"eventId": ev["id"], "round": candidate, "pairingType": "Pairing"},
+                sem,
+            )
+        except Exception:
+            logging.exception("sciontracker: pairing fetch failed for %s r%s", ev.get("id"), candidate)
+            continue
+        rows = raw_p.get("active") or raw_p.get("data") or []
+        if rows:
+            rnd, pairings = candidate, rows
+            break
+
+    entries = []
+    for uid in present:
+        me = by_uid[uid]
+        name = SCIONS.get(uid) or _name(me)
+        entry = {
+            "name":    name,
+            "faction": _faction_of(me),
+            "record":  _record_of(me),
+            "table":   "",
+            "opp":     "",
+            "opp_fac": "",
+            "score":   "",
+            "result":  "",
+        }
+
+        match, side = None, None
+        for p in pairings:
+            if _user_id_of(p.get("player1")) == uid:
+                match, side = p, "player1"
+                break
+            if _user_id_of(p.get("player2")) == uid:
+                match, side = p, "player2"
+                break
+
+        if match:
+            other = "player2" if side == "player1" else "player1"
+            my_game, opp_game = match.get(f"{side}Game"), match.get(f"{other}Game")
+            entry["table"] = _table_of(match)
+
+            if match.get(other):
+                opp_uid = _user_id_of(match.get(other))
+                entry["opp"] = _name(match.get(other))
+                opp_rec = by_uid.get(opp_uid)
+                if opp_rec:
+                    entry["opp_fac"] = _faction_of(opp_rec)
+                mp, op = _side_points(match, f"{side}Game"), _side_points(match, f"{other}Game")
+                if mp is not None or op is not None:
+                    entry["score"] = f"{mp if mp is not None else '-'}-{op if op is not None else '-'}"
+                entry["result"] = _result_str(my_game, opp_game)
+            else:
+                entry["opp"] = "(bye)"
+                entry["result"] = "W"
+        else:
+            entry["opp"] = "not paired yet" if rnd else "pairings not posted"
+
+        entries.append(entry)
+
+    entries.sort(key=lambda e: (e["table"].isdigit() is False, int(e["table"]) if e["table"].isdigit() else 0))
+    return {"event": ev, "round": rnd, "entries": entries}
+
+
+def _format_results(results: list[dict], scanned: int) -> list[str]:
+    total = sum(len(r["entries"]) for r in results)
+    lines = [
+        f"Scion Tracker - {total} scion(s) across {len(results)} event(s)  "
+        f"[{scanned} live event(s) scanned]",
+        "",
+    ]
+    for r in results:
+        ev = r["event"]
+        loc = ev.get("formatted_address") or ev.get("city") or ""
+        head = ev["name"] + (f" ({loc})" if loc else "")
+        rnd = f"Round {r['round']}" if r["round"] else "No pairings posted"
+        lines.append(f"{head} - {rnd}")
+        for e in r["entries"]:
+            tbl = f"T{e['table']}" if e["table"] else "  -"
+            who = f"{e['name']} ({e['faction']})" if e["faction"] else e["name"]
+            rec = f"[{e['record']}]" if e["record"] else ""
+            opp = f"{e['opp']} ({e['opp_fac']})" if e["opp_fac"] else e["opp"]
+            score = e["score"] or ""
+            res = e["result"] or ""
+            lines.append(f"  {tbl:<5} {who:<34} {rec:<8} {score:>7} {res:<2} vs  {opp}")
+        lines.append("")
+    lines.append("Source: bestcoastpairings.com")
+    return lines
+
+
+@aos_bot.command(
+    name="sciontracker",
+    help="Report current pairings and results for tracked players. Usage: !sciontracker [days]",
+)
+async def sciontracker_cmd(ctx, days: int = SCION_LOOKBACK_DAYS):
+    if not SCIONS:
+        return await ctx.send(":warning: The `SCIONS` roster is empty. Add BCP userIds with `!scionid <name>`.")
+    if not 0 <= days <= 14:
+        return await ctx.send(":warning: `days` must be between 0 and 14.")
+
+    cache_key = (days, tuple(sorted(SCIONS)))
+    cached = _scion_cache.get(cache_key)
+    if cached and time.time() - cached[0] < SCION_CACHE_TTL:
+        return await send_lines(ctx, cached[1])
+
+    status = await ctx.send("Scanning live events for scions…")
+    sem = asyncio.Semaphore(SCION_CONCURRENCY)
+
+    async with aiohttp.ClientSession() as session:
+        try:
+            events = await _fetch_live_events(session, sem, days)
+        except Exception as e:
+            return await status.edit(content=f":x: Couldn't fetch events: {e}")
+
+        if not events:
+            return await status.edit(content=":mag: No AoS events found in that window.")
+
+        scanned = await asyncio.gather(*[_scan_event(session, ev, sem) for ev in events])
+
+    results = [r for r in scanned if r]
+    if not results:
+        return await status.edit(
+            content=f":mag: No tracked players found at any of the {len(events)} live event(s)."
+        )
+
+    lines = _format_results(results, len(events))
+    _scion_cache[cache_key] = (time.time(), lines)
+
+    await status.delete()
+    await send_lines(ctx, lines)
+
+
+@aos_bot.command(name="scionlist", help="Show the tracked scion roster")
+async def scionlist_cmd(ctx):
+    if not SCIONS:
+        return await ctx.send("No scions tracked yet. Use `!scionid <name>` to find BCP userIds.")
+    lines = [f"Tracked scions ({len(SCIONS)}):"]
+    lines += [f"{name:<28} {uid}" for uid, name in SCIONS.items()]
+    await send_lines(ctx, lines)
+
+
+@aos_bot.command(name="scionid", help="Look up a BCP userId by player name. Usage: !scionid <name>")
+async def scionid_cmd(ctx, *, name: str):
+    name = name.strip()
+    if len(name) < 3:
+        return await ctx.send(":warning: Give me at least 3 characters.")
+
+    params = {
+        "limit":         2000,
+        "placingsType":  "player",
+        "leagueId":      ITC_LEAGUE_ID,
+        "regionId":      ITC_REGION_ID,
+        "sortAscending": "false",
+    }
+    url = f"{BASE_EVENT_URL.replace('/events', '')}/placings"
+
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url, params=params, headers=_bcp_headers()) as resp:
+            resp.raise_for_status()
+            data = (await resp.json()).get("data", [])
+
+    key = name.lower()
+    matches = [
+        e for e in data
+        if key in f"{(e.get('user') or {}).get('firstName', '')} "
+                  f"{(e.get('user') or {}).get('lastName', '')}".lower()
+    ]
+    if not matches:
+        return await ctx.send(f"No ITC entries matching **{name}**. They may not have played a ranked event this season.")
+
+    lines = [f'BCP userIds matching "{name}":', ""]
+    for e in matches[:25]:
+        u = e.get("user") or {}
+        full = f"{u.get('firstName', '')} {u.get('lastName', '')}".strip()
+        uid = _user_id_of(e) or "?"
+        lines.append(f'"{uid}": "{full}",')
+    if len(matches) > 25:
+        lines.append(f"... and {len(matches) - 25} more; narrow your search.")
+    await send_lines(ctx, lines)
 
 
 
