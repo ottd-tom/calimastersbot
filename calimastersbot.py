@@ -823,6 +823,36 @@ async def do_standings_full(ctx, ev):
     await ctx.send(f"View full placings: https://www.bestcoastpairings.com/event/{ev_id}?active_tab=placings")
 
 
+class StandingsSelect(discord.ui.Select):
+    def __init__(self, events, ctx, slim: bool = True):
+        options = []
+        for e in events:
+            loc = e.get("formatted_address", e.get("city", ""))
+            label = f"{e['name']} ({loc})"
+            if len(label) > 100:
+                label = label[:97] + "…"
+            options.append(discord.SelectOption(label=label, value=e["id"]))
+        super().__init__(placeholder="Select an event…", min_values=1, max_values=1, options=options)
+        self.events = {e["id"]: e for e in events}
+        self.ctx    = ctx
+        self.slim   = slim
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer(thinking=True)
+        ev = self.events[self.values[0]]
+        if self.slim:
+            await do_standings_slim(self.ctx, ev)
+        else:
+            await do_standings_full(self.ctx, ev)
+        self.view.stop()
+
+
+class StandingsView(discord.ui.View):
+    def __init__(self, events, slim: bool = True, ctx=None):
+        super().__init__(timeout=60)
+        self.add_item(StandingsSelect(events, ctx, slim=slim))
+
+
 @aos_bot.command(name='standings', help='Current standings at event')
 async def standings_slim_cmd(ctx, *, args: str):
     parts = args.split(maxsplit=1)
