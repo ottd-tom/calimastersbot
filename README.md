@@ -17,7 +17,7 @@ aosbot/
     stats.py            /winrates /rollwr /popularity /artefacts /traits /formations /units /hof /playerwr
     bcp.py              /standings /standingsfull /pairings /itcrank /itcstandings
     scions.py           /sciontracker /scionlist /scionid
-    personas.py         /tomgbot … /vallis /maddybot + "Adjudicate" and "Rewrite as…" context menus
+    personas.py         /tomgbot … /vallis /maddybot + the "Rewrite as…" context menu
     misc.py             /help /servers /thommoisinadequate /brianisinadequate
 pairings_image.py, scion_image.py, maddybot.py, aos_sentiment.py   unchanged
 gpt_people_bots.py      unchanged + orlando_answer moved in from the old command
@@ -40,15 +40,16 @@ only to the sentiment server.
 
 ## Dropped
 
-`!stathammer`, `!generateteam`, `!nicbot`, the Barker `on_message` handler,
+`!stathammer`, `!generateteam`, `!nicbot`, `!adjudicate`, `!wallacebot`, `!redcoatbot`,
+the Barker `on_message` handler,
 `scikit-learn` and `google-generativeai` (never imported).
 
 ## Notes
 
-- Discord allows five message context menus per app; the five rewrite bots
-  therefore share one ("Rewrite as…") with a persona dropdown. Wallace and
-  Redcoat were already written but never wired up — they're in the dropdown;
-  delete their lines in `REWRITE_PERSONAS` if unwanted.
+- The five rewrite bots share one message context menu ("Rewrite as…") with a
+  persona dropdown. The result is posted as a reply to the original message and
+  prefixed with the persona name, since bystanders can't see which context menu
+  was used or on what. The picker itself is ephemeral.
 - `openai==0.27.8` is still pinned; the persona/maddy/sentiment code uses the
   legacy `ChatCompletion.acreate` API.
 - Two small bugs fixed along the way: the GHB missions set was missing a comma

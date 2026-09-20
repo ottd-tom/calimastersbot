@@ -35,7 +35,7 @@ HELP_LINES = [
     "/pairings <event> [round] [names]",
     "/sciontracker [days]  /scionlist  /scionid <name>",
     "",
-    "Right-click a message → Apps → Adjudicate / Rewrite as…",
+    "Right-click a message → Apps → Rewrite as… (Noog, Jar Jar, Yoda, Noe, Orlando)",
     "",
     "Source: https://aos-events.com",
 ]

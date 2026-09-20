@@ -3,13 +3,12 @@ Joke / persona commands.
 
 Slash:   /tomgbot /adambot /ajbot /ebot /jobot /tomtombot /tomtomtombot /vallis /maddybot
 Message context menu (right-click a message → Apps):
-         "Adjudicate"           – rate the post by its author
-         "Rewrite as…"          – pick a persona (Noog, Jar Jar, Yoda, Noe, Orlando, …)
-                                  and post an OpenAI rewrite of the message
+         "Rewrite as…"  – pick a persona, then post an OpenAI rewrite of the message
 
 Context menus receive the target message's content in the interaction payload,
-so they work without the Message Content intent. Discord allows at most five
-message context menus per app, which is why the rewrite bots share one.
+so they work without the Message Content intent. The rewrite is posted as a
+reply to the original message and prefixed with the persona name, because
+nobody else can see which command was used or on what.
 """
 
 from __future__ import annotations
@@ -22,10 +21,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from gpt_people_bots import (
-    jarjar_answer, noe_answer, noog_answer, orlando_answer,
-    redcoat_answer, wallace_answer, yoda_answer,
-)
+from gpt_people_bots import jarjar_answer, noe_answer, noog_answer, orlando_answer, yoda_answer
 from maddybot import get_maddy_preline, maddy_answer
 
 from ..persona_data import (
@@ -45,30 +41,7 @@ REWRITE_PERSONAS: dict[str, Answerer] = {
     "Yodabot":     yoda_answer,
     "Noebot":      noe_answer,
     "Orlandobot":  orlando_answer,
-    "Wallacebot":  wallace_answer,
-    "Redcoatbot":  redcoat_answer,
 }
-
-ADJUDICATE_LINES = {
-    "thommo": [
-        "This was a clever and witty post.", "A stroke of genius, truly.", "Sharp and well-delivered.",
-        "Smartly put — impressive.", "A shining example of wit.", "Both clever and amusing.",
-    ],
-    "rozkun": [
-        "This was a dumb post.", "That was not your brightest moment.", "Pretty foolish, honestly.",
-        "This didn’t age well.", "Not exactly a smart contribution.", "This was rather silly.",
-    ],
-    "artemacus": [
-        "This was an overly wordy and articulate post.", "Verbose, yet strangely compelling.",
-        "An ocean of words for a drop of meaning.", "Grandiose and articulate to a fault.",
-        "A masterclass in over-explaining.", "Drenched in unnecessary eloquence.",
-    ],
-    "_default": [
-        "This post was mediocre.", "Nothing to write home about.", "Utterly average.",
-        "Neither here nor there.", "Decidedly unremarkable.", "Solidly… meh.",
-    ],
-}
-
 
 class PersonaSelect(discord.ui.Select):
     def __init__(self, message: discord.Message):
@@ -78,15 +51,26 @@ class PersonaSelect(discord.ui.Select):
 
     async def callback(self, interaction: discord.Interaction):
         name = self.values[0]
-        await interaction.response.defer(thinking=True)          # new interaction → public reply
+        # Keep the picker itself private; the rewrite is posted to the channel below.
+        await interaction.response.defer(ephemeral=True)
         try:
             reply = await REWRITE_PERSONAS[name](self.message)
         except Exception as e:
             log.exception("persona rewrite failed")
-            return await interaction.followup.send(f":x: {name} error: {e}")
+            return await interaction.followup.send(f":x: {name} error: {e}", ephemeral=True)
         if not reply:
-            return await interaction.followup.send(":warning: That message had no readable text.")
-        await interaction.followup.send(truncate_content(reply, 1900))
+            return await interaction.followup.send(
+                ":warning: That message had no readable text.", ephemeral=True)
+
+        prefix = f"**{name}**\n"
+        body = truncate_content(reply, 1900 - len(prefix))
+        try:
+            # Reply to the original so it's clear which message was rewritten.
+            await self.message.reply(prefix + body, mention_author=False)
+        except discord.HTTPException:
+            # Original deleted, or replies not permitted here — post plainly instead.
+            await self.message.channel.send(prefix + body)
+        await interaction.followup.send("Posted.", ephemeral=True)
         self.view.stop()
 
 
@@ -100,13 +84,10 @@ class PersonasCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         # context menus can't be defined as cog methods; register them by hand
-        self.ctx_adjudicate = app_commands.ContextMenu(name="Adjudicate", callback=self.adjudicate)
         self.ctx_rewrite = app_commands.ContextMenu(name="Rewrite as…", callback=self.rewrite)
-        bot.tree.add_command(self.ctx_adjudicate)
         bot.tree.add_command(self.ctx_rewrite)
 
     async def cog_unload(self):
-        self.bot.tree.remove_command(self.ctx_adjudicate.name, type=self.ctx_adjudicate.type)
         self.bot.tree.remove_command(self.ctx_rewrite.name, type=self.ctx_rewrite.type)
 
     # ── one-liners ──────────────────────────────────────────────────────────
@@ -161,11 +142,7 @@ class PersonasCog(commands.Cog):
             log.exception("maddybot failed")
             await send(interaction, f":x: Maddy failed to answer: {e}")
 
-    # ── context menus ───────────────────────────────────────────────────────
-    async def adjudicate(self, interaction: discord.Interaction, message: discord.Message):
-        lines = ADJUDICATE_LINES.get(message.author.name.lower(), ADJUDICATE_LINES["_default"])
-        await interaction.response.send_message(random.choice(lines))
-
+    # ── context menu ────────────────────────────────────────────────────────
     async def rewrite(self, interaction: discord.Interaction, message: discord.Message):
         await interaction.response.send_message("Rewrite that message as…", view=PersonaView(message),
                                                 ephemeral=True)

@@ -45,7 +45,13 @@ class SlashBot(commands.Bot):
 
     async def setup_hook(self):
         for make in self.cog_factories:
-            await self.add_cog(make(self))
+            try:
+                await self.add_cog(make(self))
+            except Exception:
+                # One broken cog shouldn't take the whole bot down silently.
+                log.exception("%s: FAILED to load cog %s", self.name, getattr(make, "__name__", make))
+        names = sorted(c.name for c in self.tree.get_commands())
+        log.info("%s: %d command(s) built: %s", self.name, len(names), ", ".join(names))
         if config.DEV_GUILD_ID:
             guild = discord.Object(id=config.DEV_GUILD_ID)
             self.tree.copy_global_to(guild=guild)
@@ -94,7 +100,9 @@ async def run_bot(bot: commands.Bot, token: str, initial_delay: float = 0):
                 await bot.close()
                 return
             except Exception:
-                log.exception("%s: unexpected error during login", bot.name)
+                # Covers setup_hook errors: login() runs setup_hook, so a bad
+                # cog or a failed tree.sync() surfaces here, not on_ready.
+                log.exception("%s: FAILED TO START (error during login/setup_hook)", bot.name)
                 await bot.close()
                 return
     try:

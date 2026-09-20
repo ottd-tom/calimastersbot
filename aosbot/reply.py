@@ -60,18 +60,27 @@ async def send_files(interaction: discord.Interaction, files: list[discord.File]
 
 
 def truncate_content(text: str, max_len: int = 1800) -> str:
-    """Trim text at line boundaries to <= max_len, appending a marker."""
+    """Trim text to <= max_len, preferring line boundaries, appending a marker."""
     if len(text) <= max_len:
         return text
+    marker = "…[truncated]"
+    budget = max_len - len(marker)
+    if budget <= 0:
+        return marker[:max_len]
+
     out, count = [], 0
     for line in text.splitlines():
         ln = len(line) + 1
-        if count + ln > max_len:
-            out.append("...[truncated]")
+        if count + ln > budget:
+            # Keep a partial line rather than dropping it entirely — a single
+            # unbroken paragraph would otherwise leave nothing but the marker.
+            remaining = budget - count
+            if remaining > 0:
+                out.append(line[:remaining].rstrip())
             break
         out.append(line)
         count += ln
-    return "\n".join(out)
+    return "\n".join(out).rstrip() + marker
 
 
 # ── Event picker (shared by /standings, /standingsfull, /pairings) ──────────
