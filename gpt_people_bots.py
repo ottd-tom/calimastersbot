@@ -549,3 +549,43 @@ async def noe_answer(target: discord.Message) -> Optional[str]:
         reply = reply[:300].rstrip() + "..."
 
     return reply or None
+
+
+async def _message_text(target: discord.Message) -> str:
+    """Message text, or the contents of a small text attachment."""
+    text = (getattr(target, "content", "") or "").strip()
+    if not text and getattr(target, "attachments", None):
+        for att in target.attachments:
+            if (att.size or 0) <= 200_000 and att.content_type and "text" in att.content_type:
+                try:
+                    text = (await att.read()).decode("utf-8", errors="replace")[:4000]
+                    break
+                except Exception:
+                    pass
+    return text
+
+
+async def orlando_answer(target: discord.Message) -> Optional[str]:
+    """Pompous, self-important restatement of the message (moved here from the old !orlandobot)."""
+    prev_text = await _message_text(target)
+    if not prev_text:
+        return None
+
+    system_prompt = (
+        "You are Orlandobot, a pompous, self-important AI chatbot. You take simple ideas and restate them in an inflated, verbose, and pretentious style."
+        "Your replies should be a single, showy sentence or two—never long paragraphs. "
+        "Always twist the message to be about yourself, as though everything said ultimately reflects your grandeur or unique perspective. "
+        "End every response with a smug closer offering your business card, or inquire on what happens should someone receive an award but not be there to collect it."
+    )
+    user_prompt = (
+        "Rewrite this plain message in your overblown, pretentious, self-centered Orlandobot style, ending with your signature closer: \n\n"
+        f"TEXT:\n{prev_text}"
+    )
+    resp = await openai.ChatCompletion.acreate(
+        model="gpt-4o-mini",
+        messages=[{"role": "system", "content": system_prompt},
+                  {"role": "user", "content": user_prompt}],
+        temperature=0.9,
+        max_tokens=200,
+    )
+    return resp.choices[0].message.content.strip()

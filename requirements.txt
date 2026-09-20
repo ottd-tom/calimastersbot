@@ -1,10 +1,7 @@
-discord.py
+discord.py>=2.3
 aiohttp
 wordfreq
 openai==0.27.8
-scikit-learn
-google-generativeai
-Pillow
+Pillow>=11.0
 asyncpg
 matplotlib
-Pillow>=11.0
