@@ -22,6 +22,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from gpt_people_bots import jarjar_answer, noe_answer, noog_answer, orlando_answer, yoda_answer
+from huttese import huttese_answer
 from maddybot import get_maddy_preline, maddy_answer
 
 from ..persona_data import (
@@ -41,6 +42,7 @@ REWRITE_PERSONAS: dict[str, Answerer] = {
     "Yodabot":     yoda_answer,
     "Noebot":      noe_answer,
     "Orlandobot":  orlando_answer,
+    "Jabbabot":    huttese_answer,      # Huttese, via the dictionary in huttese.py
 }
 
 class PersonaSelect(discord.ui.Select):
