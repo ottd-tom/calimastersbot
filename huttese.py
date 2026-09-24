@@ -140,6 +140,58 @@ NON_CANON: dict[str, str] = {
 
 LEXICON: dict[str, str] = {**CANON, **NON_CANON}
 
+# ── Density tiers ────────────────────────────────────────────────────────────
+# Translating every word, articles and all, produces something nobody can read.
+# On screen, Hutts mostly speak Basic and drop in the colourful words — so the
+# lexicon is split into tiers and only the flavourful end is used by default.
+
+# Structural words. Swapping these is what turns a sentence to mush, so they
+# stay in Basic unless density="full".
+GRAMMAR = {
+    "a", "and", "another", "any", "anybody", "around", "away", "back", "every",
+    "everybody", "for", "from", "he is", "her", "here", "here is", "how",
+    "how much", "i", "i am", "in", "is", "it is", "it's", "kind", "maybe", "me",
+    "my", "myself", "no", "not", "now", "off", "or", "out", "outside", "over",
+    "place", "real", "somewhere", "that", "that one", "the", "them", "there",
+    "to", "together", "too", "type", "under", "up", "very", "we", "what",
+    "when", "where", "which is", "who", "who is", "why haven't", "with", "you",
+    "your", "always", "about", "never",
+}
+
+# The words worth hearing in Huttese — greetings, insults, money, ships, and
+# the handful of nouns everyone recognises from the films.
+ICONIC = {
+    "hello", "greetings", "good-bye", "goodbye", "welcome", "excuse me",
+    "never mind", "yes", "okay", "let's go", "don't", "do not", "dammit",
+    "friend", "pal", "fool", "idiot", "punk", "worm", "scum", "slime-ball",
+    "slimeball", "coward", "boss", "bounty hunter", "smuggler", "slave",
+    "foreigner", "outlander", "woman", "girl", "boy", "man", "wookiee", "jedi",
+    "queen", "guards", "champion", "rookie", "money", "payment", "payoff",
+    "price", "credit", "credit card", "bargain", "deal", "contract", "ransom",
+    "business", "droid", "droids", "spaceship", "cruiser", "spaceport",
+    "planet", "space", "palace", "home", "sail barge", "podrace", "race",
+    "challenge", "competition", "weapon", "blaster", "gun", "kill", "die",
+    "shoot", "steal", "cheat", "kidnap", "curse", "hex", "poop", "fodder",
+    "drink", "wine", "meal", "snack", "dessert", "cake", "pie", "food",
+    "big", "mighty", "great", "incredible", "amazing", "crazy", "bad",
+    "not bad", "dangerous", "hazardous", "disgusting", "lucky", "hungry",
+    "fast", "faster", "slowly", "time", "war", "holonet", "sleep", "naptime",
+    "smile", "joke", "message", "brain damage", "two-faced", "double-crossing",
+    "low-down", "weak-minded", "hutt-size", "glorious",
+}
+
+DENSITY_LEVELS = ("light", "medium", "full")
+DEFAULT_DENSITY = "medium"
+
+
+def _translatable(key: str, density: str) -> bool:
+    if density == "full":
+        return True
+    if density == "light":
+        return key in ICONIC
+    return key not in GRAMMAR          # "medium"
+
+
 # Per the guide, these have no Huttese equivalent at all — dropping them is
 # more authentic than translating them.
 NO_EQUIVALENT = {"please", "thank you", "thanks"}
@@ -170,32 +222,37 @@ def _match_case(source: str, replacement: str) -> str:
     return replacement
 
 
-def _lookup(phrase: str) -> Optional[str]:
-    """Exact match, then a few cheap English inflections."""
+def _lookup(phrase: str, density: str = "full") -> Optional[str]:
+    """Exact match, then a few cheap English inflections, honouring density."""
     key = phrase.lower()
     if key in LEXICON:
-        return LEXICON[key]
+        return LEXICON[key] if _translatable(key, density) else None
     if " " in key:
         return None
     for suffix, stem in (("s", ""), ("es", ""), ("ed", ""), ("ing", ""),
                          ("ies", "y"), ("ied", "y")):
         if key.endswith(suffix) and len(key) > len(suffix) + 1:
-            candidate = key[: -len(suffix)] + stem
-            if candidate in LEXICON:
-                return LEXICON[candidate]
-            if suffix in ("ed", "ing") and candidate + "e" in LEXICON:   # moved -> move
-                return LEXICON[candidate + "e"]
-            if suffix in ("ed", "ing") and len(candidate) > 2 and candidate[-1] == candidate[-2]:
-                if candidate[:-1] in LEXICON:                             # stopped -> stop
-                    return LEXICON[candidate[:-1]]
+            for cand in (candidate := key[: -len(suffix)] + stem,
+                         candidate + "e" if suffix in ("ed", "ing") else None,
+                         candidate[:-1] if suffix in ("ed", "ing") and len(candidate) > 2
+                         and candidate[-1] == candidate[-2] else None):
+                if cand and cand in LEXICON:
+                    return LEXICON[cand] if _translatable(cand, density) else None
     return None
 
 
 _TOKEN = re.compile(r"[A-Za-z][A-Za-z'’-]*|\d+|\s+|[^\sA-Za-z\d]+")
 
 
-def translate(text: str) -> tuple[str, TranslationStats]:
-    """Substitute every Basic word that appears in the lexicon."""
+def translate(text: str, density: str = DEFAULT_DENSITY) -> tuple[str, TranslationStats]:
+    """Substitute Basic words for Huttese ones.
+
+    density="light"  only the iconic words (most readable)
+    density="medium" everything except structural grammar words (default)
+    density="full"   every word in the lexicon (authentic, near-unreadable)
+    """
+    if density not in DENSITY_LEVELS:
+        density = DEFAULT_DENSITY
     tokens = _TOKEN.findall(text)
     words = [i for i, t in enumerate(tokens) if t[:1].isalpha()]
     stats = TranslationStats(total=len(words))
@@ -226,7 +283,7 @@ def translate(text: str) -> tuple[str, TranslationStats]:
                 pos += span
                 break
 
-            hit = _lookup(phrase)
+            hit = _lookup(phrase, density)
             if hit:
                 out[idxs[0]] = _match_case(tokens[idxs[0]], hit)
                 for j in idxs[1:]:
@@ -281,6 +338,10 @@ SYSTEM_PROMPT = (
     "- NEVER invent Huttese words. If a word is still in Basic (English) and you "
     "have no dictionary entry for it, leave it in Basic — Hutts mix the two "
     "constantly.\n"
+    "- The message is DELIBERATELY a mix of Basic and Huttese, the way Hutts "
+    "actually speak on screen. Do NOT translate any more of it into Huttese, and "
+    "do not replace Basic words with Huttese ones yourself — that makes it "
+    "unreadable. Keep roughly the mix you are given.\n"
     "- Huttese word order is loose and often reversed; you may reorder freely.\n"
     "- You may add flavour words from the supplied list, a booming 'Ho ho ho', "
     "or address the speaker as a wermo, sleemo or koochoo.\n"
@@ -289,15 +350,18 @@ SYSTEM_PROMPT = (
 )
 
 
-async def huttese_answer(target) -> Optional[str]:
-    """Translate a Discord message into Huttese. Works with or without OpenAI."""
+async def huttese_answer(target, density: str = DEFAULT_DENSITY) -> Optional[str]:
+    """Translate a Discord message into Huttese. Works with or without OpenAI.
+
+    Change DEFAULT_DENSITY above to dial the whole persona up or down.
+    """
     from gpt_people_bots import _message_text          # shared attachment handling
 
     text = await _message_text(target)
     if not text:
         return None
 
-    literal, stats = translate(text)
+    literal, stats = translate(text, density)
 
     glossary = "\n".join(stats.used) or "(no dictionary matches)"
     user_prompt = (
@@ -305,7 +369,7 @@ async def huttese_answer(target) -> Optional[str]:
         f"Dictionary substitution:\n{literal}\n\n"
         f"Words that were translated:\n{glossary}\n\n"
         f"Flavour words you may add: {', '.join(FLAVOUR)}\n\n"
-        "Polish the substitution into Hutt speech."
+        "Polish the substitution into Hutt speech, keeping the same Basic/Huttese mix."
     )
 
     try:
