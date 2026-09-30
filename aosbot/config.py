@@ -47,6 +47,12 @@ CURRENT_LEAGUE_YEAR = 2026
 # ── Discord IDs ──────────────────────────────────────────────────────────────
 THOMMO_USER_ID = 199725130337878017
 
+# ── Barker auto-reply (Cali Masters bot only) ────────────────────────────────
+# BARKER_GUILD_ID must be a server the CALI bot is in, not just the AoS bot.
+BARKER_USER_ID  = 684591023678292010
+BARKER_GUILD_ID = 803881553108795413          # SoCal AoS
+BARKER_REPLY    = "BCP sucks"
+
 CORSAIR_SERVER_ID  = 1071183737024434336
 CORSAIR_CHANNEL_ID = 1350184533349367882
 
