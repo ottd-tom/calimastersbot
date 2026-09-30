@@ -1,8 +1,10 @@
 """
 Entry point: runs the Cali Masters, AoS Events and Texas Masters bots in one process.
 
-All three are slash-command only and need no privileged intents.
-The sentiment bot (which needs Message Content) lives in sentiment_bot.py.
+All three are slash-command only. AoS Events and Texas need no privileged
+intents; Cali Masters additionally requests Message Content for the Barker
+auto-reply, so that intent must be enabled for the Cali app (and only that app)
+in the Developer Portal. The sentiment bot lives in sentiment_bot.py.
 
     python main.py
 """
@@ -18,6 +20,7 @@ import openai
 from discord.ext import commands
 
 from aosbot import config
+from aosbot.cogs.barker import BarkerCog
 from aosbot.cogs.bcp import BcpCog
 from aosbot.cogs.masters import CALI, TEXAS, MastersCog, Region
 from aosbot.cogs.misc import MiscCog
@@ -30,15 +33,19 @@ log = logging.getLogger("main")
 
 openai.api_key = config.OPENAI_API_KEY
 
-# Slash commands don't need message content; guilds is enough for bot.guilds and channel lookups.
-INTENTS = discord.Intents(guilds=True)
+# Slash commands need no privileged intents; guilds alone covers bot.guilds and
+# channel lookups. The Cali bot additionally reads message content for the
+# Barker reply, so intents are chosen per bot rather than shared.
+INTENTS_SLASH_ONLY    = discord.Intents(guilds=True)
+INTENTS_WITH_MESSAGES = discord.Intents(guilds=True, guild_messages=True, message_content=True)
 
 
 class SlashBot(commands.Bot):
     """commands.Bot with no prefix commands; cogs are attached and synced in setup_hook."""
 
-    def __init__(self, name: str, cog_factories):
-        super().__init__(command_prefix=commands.when_mentioned, intents=INTENTS,
+    def __init__(self, name: str, cog_factories, intents: discord.Intents | None = None):
+        super().__init__(command_prefix=commands.when_mentioned,
+                         intents=intents or INTENTS_SLASH_ONLY,
                          help_command=None, description=name)
         self.name = name
         self.cog_factories = cog_factories
@@ -64,8 +71,13 @@ class SlashBot(commands.Bot):
         log.info("%s: ready as %s in %d guild(s)", self.name, self.user, len(self.guilds))
 
 
-def make_masters_bot(region: Region) -> SlashBot:
-    return SlashBot(f"{region.name} Masters", [lambda bot: MastersCog(bot, region)])
+def make_masters_bot(region: Region, *, barker: bool = False) -> SlashBot:
+    """barker=True also enables the message-content intent for this bot only."""
+    cogs = [lambda bot: MastersCog(bot, region)]
+    if barker:
+        cogs.append(BarkerCog)
+    return SlashBot(f"{region.name} Masters", cogs,
+                    intents=INTENTS_WITH_MESSAGES if barker else None)
 
 
 def make_aos_bot() -> SlashBot:
@@ -123,7 +135,7 @@ async def main():
         return
 
     await asyncio.gather(
-        run_bot(make_masters_bot(CALI),  config.TOKEN_CALI,  initial_delay=0),
+        run_bot(make_masters_bot(CALI, barker=True), config.TOKEN_CALI, initial_delay=0),
         run_bot(make_aos_bot(),          config.TOKEN_AOS,   initial_delay=12),
         run_bot(make_masters_bot(TEXAS), config.TOKEN_TEXAS, initial_delay=24),
         return_exceptions=True,
