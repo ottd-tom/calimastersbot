@@ -52,6 +52,9 @@ THOMMO_USER_ID = 199725130337878017
 BARKER_USER_ID  = 684591023678292010
 BARKER_GUILD_ID = 803881553108795413          # SoCal AoS
 BARKER_REPLY    = "BCP sucks"
+# Also fire on acrostics ("Bring Coffee Please"). The one rule that catches
+# innocent messages, so it's off by default — see aosbot/bcp_detect.py.
+BARKER_CATCH_INITIALS = False
 
 CORSAIR_SERVER_ID  = 1071183737024434336
 CORSAIR_CHANNEL_ID = 1350184533349367882
