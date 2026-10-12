@@ -213,7 +213,7 @@ GHB_MISSIONS = [
     "What's Yours is Ours",
     "Warped Ruins",
     "Curse of the Gnaw",
-    "Sieze the Embers",
+    "Seize the Embers",
     "Treacherous Ground",
     "Escape from the Coast",
     "Power of the Realms",
