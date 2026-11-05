@@ -154,6 +154,8 @@ vallis_responses = {
 
     "nosense": "It's a horrible way to write the rule.",
 
+    "nitpicky": "It's an esoteric and nitpicky distinction, to be sure.",
+
     "chainfight": (
         "There are actually a few questions about chain fighting a strike-first. "
         "There's the classic \"can I pull my non-strike-first unit into the strike-first phase?\" "
