@@ -104,6 +104,7 @@ EMOJI_MAP = {
     "Fyreslayers":           "🪓",
     "Gloomspite Gitz":       "🍄",
     "Helsmiths of Hashut":   "🎩",
+    "Khazalite Holds":       "⛏️",
 }
 
 ALIAS_MAP: dict[str, str] = {
