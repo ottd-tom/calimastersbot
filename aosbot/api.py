@@ -8,9 +8,10 @@ lives here once.
 from __future__ import annotations
 
 import asyncio
+import os
 from datetime import datetime, timedelta
 from typing import Any
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 
 import aiohttp
 
@@ -21,7 +22,24 @@ from .config import (
 
 # ── aos-events.com ───────────────────────────────────────────────────────────
 
+# The site's API only answers its own pages and clients with a key. Set
+# AOS_EVENTS_API_KEY to the bot's key from the API_KEYS variable in Render.
+AOS_EVENTS_API_KEY = os.getenv("DISCORD_BOT", "").strip()
+
+
+def aos_headers() -> dict:
+    h = {"Accept": "application/json", "User-Agent": "AoSEventsBot/1.0"}
+    if AOS_EVENTS_API_KEY:
+        h["X-API-Key"] = AOS_EVENTS_API_KEY
+    return h
+
+
 async def fetch_json(url: str, *, params: dict | None = None, headers: dict | None = None) -> Any:
+    # The key is only added for aos-events.com, never sent to other hosts.
+    host = (urlparse(url).hostname or "").lower()
+    if host == "aos-events.com" or host.endswith(".aos-events.com") or (
+            API_URL and url.startswith(API_URL)):
+        headers = {**aos_headers(), **(headers or {})}
     async with aiohttp.ClientSession() as session:
         async with session.get(url, params=params, headers=headers) as resp:
             resp.raise_for_status()
