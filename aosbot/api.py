@@ -24,7 +24,7 @@ from .config import (
 
 # The site's API only answers its own pages and clients with a key. Set
 # AOS_EVENTS_API_KEY to the bot's key from the API_KEYS variable in Render.
-AOS_EVENTS_API_KEY = os.getenv("DISCORD_BOT", "").strip()
+AOS_EVENTS_API_KEY = os.getenv("AOS_EVENTS_API_KEY", "").strip()
 
 
 def aos_headers() -> dict:
